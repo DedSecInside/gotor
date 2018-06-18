@@ -5,14 +5,19 @@ const htmlPlugin = new HtmlWebPackPlugin({
     filename: "./index.html"
 });
 
+
 module.exports = {
+    entry: {
+        main: "./src/index.jsx"
+    },
+    resolve: {
+        extensions: ['*', '.js', '.jsx']
+    },
     module: {
         rules: [{
-            test: /\.js$/,
+            test: /\.(js|jsx)?$/,
             exclude: /node_modules/,
-            use: {
-                loader: "babel-loader"
-            }
+            use: ['babel-loader']
         }, {
             test: /\.css$/,
             use: [{
@@ -28,5 +33,8 @@ module.exports = {
             }]
         }]
     },
-    plugins: [htmlPlugin]
+    plugins: [htmlPlugin],
+    devServer: {
+        contentBase: './dist/index.html',
+    }
 };
