@@ -9,7 +9,7 @@ class TorBotArguments extends React.Component {
 
   render() {
     return (
-      <select onChange={this.props.handler}>
+      <select className="dropdown-select" onChange={this.props.handler}>
         {
         this.props.args.map((arg) => {
             return <option name='argument' value={arg}>{arg}</option>;

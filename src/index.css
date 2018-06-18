@@ -1,6 +1,7 @@
 body {
   height: 100%;
   width: 100%;
+  background-color: black;
 }
 
 #siteFieldTitle {
@@ -28,4 +29,22 @@ body {
   padding: 2px 2px 2px 2px;
   border: 2px solid rgb(28, 243, 92);
   font-family: monospace;
+}
+
+#submitBtn {
+  color: rgb(28, 243, 92);
+  font-family: monospace;
+  border-radius: 25px;
+  background-color: black;
+  border: 0;
+  border: 2px solid rgb(28, 243, 92);
+}
+
+.dropdown-select {
+  margin: 0px 0px 10px 0px;
+  color: rgb(28, 243, 92);
+  font-family: monospace;
+  border-radius: 25px;
+  background-color: black;
+  border: 0;
 }
