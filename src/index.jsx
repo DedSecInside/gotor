@@ -38,16 +38,16 @@ class TorBotForm extends React.Component {
 
     render() {
         return (
-            <form onSubmit={this.handleSubmit} id ="Main">
-              <label> Website:
-                <input type="text" name='website'/>
+            <form onSubmit={this.handleSubmit} id ="mainForm">
+              <label id='siteFieldTitle'> Website:
+                <input id='siteName' type='text' name='website'/>
               </label>
               <br/>
-              <label> Option:
+              <label id='optionTitle'> Option:
                 <TorBotArguments handler={this.handleChange} args={this.props.args}/>
             </label>
             <br/>
-            <input type="submit"/>
+            <input id='submitBtn' type="submit"/>
            </form>
         );
     }

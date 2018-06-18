@@ -1,3 +1,31 @@
-input {
+body {
+  height: 100%;
   width: 100%;
+}
+
+#siteFieldTitle {
+  background-color: black;
+  color: rgb(28, 243, 92);
+  border-radius: 25px;
+  padding: 2px 2px 2px 2px;
+  border: 2px solid rgb(28, 243, 92);
+  font-family: monospace;
+}
+
+#siteName {
+  background-color: black;
+  color: rgb(28, 243, 92);
+  font-family: monospace;
+  margin: 0px 0px 10px 0px;
+  border: 0;
+  border-radius: 25px;
+}
+
+#optionTitle {
+  background-color: black;
+  color: rgb(28, 243, 92);
+  border-radius: 25px;
+  padding: 2px 2px 2px 2px;
+  border: 2px solid rgb(28, 243, 92);
+  font-family: monospace;
 }
