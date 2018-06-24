@@ -33,8 +33,18 @@ class TorBotForm extends React.Component {
   }
 
   handleSubmit(event) {
-    console.log(this.state.option);
-  }
+    if (this.state.option === 'LIVE') {
+      fetch('http://localhost:8080/LIVE').then(data => {
+        return data.json();
+      }).then(data => {
+        console.log(data);
+        debugger;
+      }).catch(error => {
+        alert(error);
+        debugger;
+      });
+      }
+    }
 
     render() {
         return (
