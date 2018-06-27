@@ -8,26 +8,23 @@ import (
 )
 
 type Result struct {
-	Message string `json:"msg"`
-	ID      int    `json:"id"`
+	Website string `json:"website"`
+	Option  string `json:"option"`
 }
 
 func linksHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		res := Result{"Hello World", 1}
-		jData, err := json.Marshal(res)
+	if r.Method == "POST" {
+		res := Result{}
+		err := json.NewDecoder(r.Body).Decode(&res)
 		if err != nil {
 			panic(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.WriteHeader(http.StatusOK)
-		w.Write(jData)
+		fmt.Println(res)
 	}
 }
 
 func main() {
 	http.HandleFunc("/LIVE", linksHandler)
-	fmt.Println("Serving on localhost:8080/LIVE")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Println("Serving on localhost:8008/LIVE")
+	log.Fatal(http.ListenAndServe(":8008", nil))
 }

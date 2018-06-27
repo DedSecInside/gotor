@@ -23,19 +23,26 @@ class TorBotArguments extends React.Component {
 class TorBotForm extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {option: 'MAIL'};
+    this.state = {option: 'MAIL', website: ''};
     this.handleChange = this.handleChange.bind(this);
+    this.inputChange = this.inputChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
   }
 
+  inputChange(event) {
+    this.setState({option: this.state.option, website: event.target.value});
+  }
   handleChange(event) {
-    this.setState({option: event.target.value});
+    this.setState({option: event.target.value, website: this.state.website});
   }
 
   handleSubmit(event) {
     if (this.state.option === 'LIVE') {
-      fetch('http://localhost:8080/LIVE').then(data => {
-        return data.json();
+      fetch('http://localhost:8008/LIVE', {
+        body: JSON.stringify(this.state),
+        method: 'POST'
+      }).then(response => {
+        return response.json();
       }).then(data => {
         console.log(data);
         debugger;
@@ -50,11 +57,11 @@ class TorBotForm extends React.Component {
         return (
             <form onSubmit={this.handleSubmit} id ="mainForm">
               <label id='siteFieldTitle'> Website:
-                <input id='siteName' type='text' name='website'/>
+                <input onChange={this.inputChange} id='siteName' type='text' name='website'/>
               </label>
               <br/>
               <label id='optionTitle'> Option:
-                <TorBotArguments handler={this.handleChange} args={this.props.args}/>
+                <TorBotArguments handler={this.handleChange}args={this.props.args}/>
             </label>
             <br/>
             <input id='submitBtn' type="submit"/>
