@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./goBot"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,9 +18,13 @@ func linksHandler(w http.ResponseWriter, r *http.Request) {
 		res := Result{}
 		err := json.NewDecoder(r.Body).Decode(&res)
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
 		}
-		fmt.Println(res)
+		links, err := geturls.GetLinks(res.Website, "", "", 15, 1)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(links)
 	}
 }
 
