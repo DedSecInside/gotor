@@ -5,12 +5,18 @@ body {
   vertical-align: middle;
 }
 
+th,
+tr,
+td {
+  color: rgb(28, 243, 92);
+}
+
 #siteFieldTitle {
   background-color: black;
   color: rgb(28, 243, 92);
   border-radius: 25px;
-  padding: 2px 2px 2px 2px;
-  border: 2px solid rgb(28, 243, 92);
+  padding: 2px 2px 2px 5px;
+  border: 1px solid rgb(28, 243, 92);
   font-family: monospace;
 }
 
@@ -20,32 +26,40 @@ body {
   font-family: monospace;
   margin: 0px 0px 10px 0px;
   border: 0;
-  border-radius: 25px;
+  border-radius: 15px;
 }
 
 #optionTitle {
   background-color: black;
   color: rgb(28, 243, 92);
-  border-radius: 25px;
-  padding: 2px 2px 2px 2px;
-  border: 2px solid rgb(28, 243, 92);
+  border-radius: 15px;
+  padding: 2px 2px 2px 5px;
+  border: 1px solid rgb(28, 243, 92);
   font-family: monospace;
 }
 
 #submitBtn {
   color: rgb(28, 243, 92);
   font-family: monospace;
-  border-radius: 25px;
+  border-radius: 15px;
   background-color: black;
   border: 0;
-  border: 2px solid rgb(28, 243, 92);
+  border: 1px solid rgb(28, 243, 92);
 }
 
 .dropdown-select {
   margin: 0px 0px 10px 0px;
   color: rgb(28, 243, 92);
   font-family: monospace;
-  border-radius: 25px;
+  border-radius: 15px;
   background-color: black;
   border: 0;
+}
+
+input[type=text]:focus {
+  outline-width: 0;
+}
+
+select:focus {
+  outline-width: 0;
 }

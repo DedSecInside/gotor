@@ -20,10 +20,37 @@ class TorBotArguments extends React.Component {
   }
 }
 
+class DisplayURLs extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (
+      <table>
+        <thead>
+          <tr>
+            <th> URLS </th>
+          </tr>
+        </thead>
+        <tbody>
+        {
+          this.props.websites.map((website, idx) => {
+          return <tr name="website" key={website}>
+                  <td>{idx+1}. {website}</td>
+                </tr>;
+          })
+        }
+      </tbody>
+    </table>
+    )
+  }
+}
+
 class TorBotForm extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {option: 'MAIL', website: ''};
+    this.state = {option: 'Retrieve Mail', website: ''};
     this.handleChange = this.handleChange.bind(this);
     this.inputChange = this.inputChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
@@ -37,18 +64,19 @@ class TorBotForm extends React.Component {
   }
 
   handleSubmit(event) {
-    if (this.state.option === 'LIVE') {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.state.option === 'Retrieve URLs') {
       fetch('http://localhost:8008/LIVE', {
         body: JSON.stringify(this.state),
         method: 'POST'
       }).then(response => {
+        // object has 'websites' property that contains an array of links
         return response.json();
       }).then(data => {
-        console.log(data);
-        debugger;
+        handleURLs(data);
       }).catch(error => {
         alert(error);
-        debugger;
       });
       }
     }
@@ -70,7 +98,11 @@ class TorBotForm extends React.Component {
     }
 }
 
-var flags = ['MAIL', 'LIVE', 'INFO']
+function handleURLs(data) {
+  ReactDOM.render(<DisplayURLs websites={data.websites}/>, document.getElementById('root'));
+}
+
+var flags = ['Retrieve Emails', 'Retrieve URLs', 'Retrieve Information']
 ReactDOM.render(<TorBotForm args={flags}/>, document.getElementById('root'));
 
 

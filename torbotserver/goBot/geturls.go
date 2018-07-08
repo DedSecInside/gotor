@@ -10,7 +10,6 @@ import (
 
 	"github.com/mgutz/ansi"
 	"golang.org/x/net/html"
-	"golang.org/x/net/proxy"
 )
 
 // Checks for valid .onion domain names
@@ -55,14 +54,13 @@ func newTorConn(addr string, port string, timeout int) *http.Client {
 	if err != nil {
 		log.Fatal("Error parsing URL: ", err)
 	}
-	tbDialer, err := proxy.FromURL(torProxyURL, proxy.Direct)
-	torTransport := &http.Transport{Dial: tbDialer.Dial}
+	torTransport := &http.Transport{Proxy: http.ProxyURL(torProxyURL)}
 	return &http.Client{Transport: torTransport, Timeout: time.Second * time.Duration(timeout)}
 }
 
-func GetLinks(searchURL string, addr string, port string, timeout int, ext int) ([]string, error) {
+func GetLinks(searchURL string, addr string, port string, timeout int) ([]string, error) {
 	var client *http.Client
-	if ext == 1 {
+	if port == "" && addr == "" {
 		client = &http.Client{Timeout: time.Second * time.Duration(timeout)}
 	} else {
 		client = newTorConn(addr, port, timeout)
