@@ -20,6 +20,7 @@ class TorBotArguments extends React.Component {
   }
 }
 
+
 class DisplayURLs extends React.Component {
   constructor(props) {
     super(props);
@@ -47,9 +48,15 @@ class DisplayURLs extends React.Component {
         <tbody>
         {
           Object.keys(this.props.websites).map((website, idx) => {
-          return <tr name="website" key={website}>
-                  <td>{idx+1}. {website}</td>
-                </tr>;
+            if (this.props.websites[website] == true) {
+              return <tr name="website" key={website}>
+                      <td id="goodLink">{idx+1}. {website}</td>
+                    </tr>;
+            } else {
+              return <tr name="website" key={website}>
+                      <td id="badLink">{idx+1}. {website}</td>
+                    </tr>;
+            }
           })
         }
       </tbody>

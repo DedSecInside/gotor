@@ -17,6 +17,14 @@ td {
   text-align: center;
 }
 
+#goodLink {
+  color: rgb(28, 243, 92);
+}
+
+#badLink {
+  color: red;
+}
+
 #siteFieldTitle {
   background-color: black;
   color: rgb(28, 243, 92);
