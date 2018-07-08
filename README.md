@@ -8,4 +8,4 @@ The only method that works currently is the `-l` argument from TorBot which list
 
 Currently goTor is only ran locally using webpack. To run goTor using webpack-dev-sever, simply run `npm run start`. This will launch goTor's front-end for you (and provide auto-reloads on active files if you're a developer). To start goTor's backend, you can simply run `go run server.go`, the server must be ran before you can actually use goTor fully.
 
-![home](https://raw.github.com/KingAkeem/goTor/screenshot/screenshots/Home Page.png)
+![home](https://raw.github.com/KingAkeem/goTor/screenshot/screenshots/Home_page.png)
