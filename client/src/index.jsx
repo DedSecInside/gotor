@@ -46,7 +46,7 @@ class DisplayURLs extends React.Component {
         </tfoot>
         <tbody>
         {
-          this.props.websites.map((website, idx) => {
+          Object.keys(this.props.websites).map((website, idx) => {
           return <tr name="website" key={website}>
                   <td>{idx+1}. {website}</td>
                 </tr>;
@@ -85,6 +85,7 @@ class TorBotForm extends React.Component {
         // object has 'websites' property that contains an array of links
         return response.json();
       }).then(data => {
+        debugger;
         handleURLs(data);
       }).catch(error => {
         alert(error);
