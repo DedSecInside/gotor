@@ -1,7 +1,7 @@
 {
-    "name": "torbotviewer",
+    "name": "gotor",
     "version": "1.0.0",
-    "description": "This is a GUI for using TorBot",
+    "description": "This is a web application that provides easy access to TorBot.",
     "main": "index.js",
     "scripts": {
         "watch": "webpack --mode development --watch",
@@ -10,14 +10,14 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/KingAkeem/TorBotViewer.git"
+        "url": "git+https://github.com/KingAkeem/goTor.git"
     },
     "author": "Akeem King",
-    "license": "ISC",
+    "license": "MIT",
     "bugs": {
-        "url": "https://github.com/KingAkeem/TorBotViewer/issues"
+        "url": "https://github.com/KingAkeem/goTor/issues"
     },
-    "homepage": "https://github.com/KingAkeem/TorBotViewer#readme",
+    "homepage": "https://github.com/KingAkeem/goTorr#readme",
     "devDependencies": {
         "@babel/preset-env": "^7.0.0-beta.49",
         "@babel/preset-react": "^7.0.0-beta.49",
