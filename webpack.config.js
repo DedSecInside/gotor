@@ -23,8 +23,5 @@ module.exports = {
       loader: "style-loader!css-loader"
     }]
   },
-  plugins: [htmlPlugin],
-  devServer: {
-    contentBase: './dist/index.html',
-  }
+  plugins: [htmlPlugin]
 };
