@@ -12,6 +12,7 @@ import (
 
 type Client interface {
 	Get(string) (*http.Response, error)
+	Head(string) (*http.Response, error)
 }
 
 type dualClient struct {
@@ -35,12 +36,20 @@ func newTorClient(addr string, port string, timeout int) *dualClient {
 
 }
 
+func (d *dualClient) Head(url string) (*http.Response, error) {
+	if strings.Contains(url, ".onion") {
+		return d.torClient.Head(url)
+	}
+
+	return d.regClient.Head(url)
+}
+
 func (d *dualClient) Get(url string) (*http.Response, error) {
 	if strings.Contains(url, ".onion") {
 		return d.torClient.Get(url)
-	} else {
-		return d.regClient.Get(url)
 	}
+
+	return d.regClient.Get(url)
 }
 
 // Sends string to channel that contains a message that explains the
@@ -49,7 +58,7 @@ func checkURL(client Client, url string) (bool, error) {
 	var err error
 	var isURLAlive bool
 
-	resp, err := client.Get(url)
+	resp, err := client.Head(url)
 	if err == nil && resp.StatusCode < 400 {
 		isURLAlive = true
 	} else {
@@ -61,9 +70,12 @@ func checkURL(client Client, url string) (bool, error) {
 // Parses html attributes to find urls
 func parseAttrs(attributes []html.Attribute) []string {
 	var foundUrls = make([]string, 0)
+	var url *urllib.URL
+	var err error
 	for i := 0; i < len(attributes); i++ {
-		if attributes[i].Key == "href" {
-			foundUrls = append(foundUrls, attributes[i].Val)
+		url, err = urllib.ParseRequestURI(attributes[i].Val)
+		if attributes[i].Key == "href" && url.Scheme != "" && err == nil {
+			foundUrls = append(foundUrls, url.String())
 		}
 	}
 
