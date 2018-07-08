@@ -25,6 +25,10 @@ class DisplayURLs extends React.Component {
     super(props);
   }
 
+  goBack() {
+    main()
+  }
+
   render() {
     return (
       <table>
@@ -33,6 +37,13 @@ class DisplayURLs extends React.Component {
             <th> URLS </th>
           </tr>
         </thead>
+        <tfoot>
+          <tr>
+            <td>
+              <button onClick={this.goBack} id="backButton">BACK</button>
+            </td>
+          </tr>
+        </tfoot>
         <tbody>
         {
           this.props.websites.map((website, idx) => {
@@ -102,7 +113,10 @@ function handleURLs(data) {
   ReactDOM.render(<DisplayURLs websites={data.websites}/>, document.getElementById('root'));
 }
 
-var flags = ['Retrieve Emails', 'Retrieve URLs', 'Retrieve Information']
-ReactDOM.render(<TorBotForm args={flags}/>, document.getElementById('root'));
+function main() {
+  var flags = ['Retrieve Emails', 'Retrieve URLs', 'Retrieve Information']
+  ReactDOM.render(<TorBotForm args={flags}/>, document.getElementById('root'));
+}
 
+main()
 

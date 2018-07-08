@@ -39,10 +39,19 @@ td {
 }
 
 #submitBtn {
-  color: rgb(28, 243, 92);
+  background-color: rgb(28, 243, 92);
   font-family: monospace;
   border-radius: 15px;
-  background-color: black;
+  color: black;
+  border: 0;
+  border: 1px solid rgb(28, 243, 92);
+}
+
+#backButton {
+  background-color: rgb(28, 243, 92);
+  font-family: monospace;
+  border-radius: 15px;
+  color: black;
   border: 0;
   border: 1px solid rgb(28, 243, 92);
 }
