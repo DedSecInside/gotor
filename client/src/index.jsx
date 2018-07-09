@@ -1,6 +1,7 @@
 import css from './index.css';
 import React from "react";
 import ReactDOM from "react-dom";
+import DisplayURLs from "./options.jsx";
 
 class TorBotArguments extends React.Component {
   constructor(props) {
@@ -21,49 +22,6 @@ class TorBotArguments extends React.Component {
 }
 
 
-class DisplayURLs extends React.Component {
-  constructor(props) {
-    super(props);
-  }
-
-  goBack() {
-    main()
-  }
-
-  render() {
-    return (
-      <table>
-        <thead>
-          <tr>
-            <th> URLS </th>
-          </tr>
-        </thead>
-        <tfoot>
-          <tr>
-            <td>
-              <button onClick={this.goBack} id="backButton">BACK</button>
-            </td>
-          </tr>
-        </tfoot>
-        <tbody>
-        {
-          Object.keys(this.props.websites).map((website, idx) => {
-            if (this.props.websites[website] == true) {
-              return <tr name="website" key={website}>
-                      <td id="goodLink">{idx+1}. {website}</td>
-                    </tr>;
-            } else {
-              return <tr name="website" key={website}>
-                      <td id="badLink">{idx+1}. {website}</td>
-                    </tr>;
-            }
-          })
-        }
-      </tbody>
-    </table>
-    )
-  }
-}
 
 class TorBotForm extends React.Component {
   constructor(props) {
@@ -92,7 +50,6 @@ class TorBotForm extends React.Component {
         // object has 'websites' property that contains an array of links
         return response.json();
       }).then(data => {
-        debugger;
         handleURLs(data);
       }).catch(error => {
         alert(error);
@@ -117,14 +74,12 @@ class TorBotForm extends React.Component {
     }
 }
 
+export default TorBotForm;
+
 function handleURLs(data) {
-  ReactDOM.render(<DisplayURLs websites={data.websites}/>, document.getElementById('root'));
+  ReactDOM.render(<DisplayURLs flags={flags}websites={data.websites}/>, document.getElementById('root'));
 }
 
-function main() {
-  var flags = ['Retrieve Emails', 'Retrieve URLs', 'Retrieve Information']
-  ReactDOM.render(<TorBotForm args={flags}/>, document.getElementById('root'));
-}
-
-main()
+var flags = ['Retrieve Emails', 'Retrieve URLs', 'Retrieve Information']
+ReactDOM.render(<TorBotForm args={flags}/>, document.getElementById('root'));
 
