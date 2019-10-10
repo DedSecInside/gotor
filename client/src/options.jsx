@@ -16,7 +16,7 @@ class DisplayURLs extends React.Component {
       <table>
         <thead>
           <tr>
-            <th> URLS FOUND </th>
+            <th> URL'S FOUND </th>
           </tr>
         </thead>
         <tfoot>
