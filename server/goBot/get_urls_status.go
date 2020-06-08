@@ -70,11 +70,13 @@ func checkURL(client Client, url string) (bool, error) {
 // Parses html attributes to find urls
 func parseAttrs(attributes []html.Attribute) []string {
 	var foundUrls = make([]string, 0)
-	var url *urllib.URL
-	var err error
 	for i := 0; i < len(attributes); i++ {
-		url, err = urllib.ParseRequestURI(attributes[i].Val)
-		if attributes[i].Key == "href" && url.Scheme != "" && err == nil {
+		url, err := urllib.ParseRequestURI(attributes[i].Val)
+		if url == nil || err != nil {
+			continue
+		}
+		log.Printf("%+v", url)
+		if attributes[i].Key == "href" && url.Scheme != "" {
 			foundUrls = append(foundUrls, url.String())
 		}
 	}

@@ -1,27 +1,38 @@
-const HtmlWebPackPlugin = require("html-webpack-plugin");
-
-const htmlPlugin = new HtmlWebPackPlugin({
-  template: "./src/index.html",
-  filename: "./index.html"
-});
-
+const path = require("path");
+const webpack = require("webpack");
 
 module.exports = {
-  entry: {
-    main: "./src/index.jsx"
-  },
-  resolve: {
-    extensions: ['*', '.js', '.jsx']
-  },
-  module: {
-    rules: [{
-      test: /\.(js|jsx)?$/,
-      exclude: /node_modules/,
-      use: ['babel-loader']
-    }, {
-      test: /\.css$/,
-      loader: "style-loader!css-loader"
-    }]
-  },
-  plugins: [htmlPlugin]
+    entry: "./src/index.js",
+    mode: "development",
+    module: {
+        rules: [{
+                test: /\.(js|jsx)$/,
+                exclude: /(node_modules|bower_components)/,
+                loader: "babel-loader",
+                options: {
+                    presets: ["@babel/env"]
+                }
+            },
+            {
+                test: /\.css$/,
+                use: ["style-loader", "css-loader"]
+            }
+        ]
+    },
+    resolve: {
+        extensions: ["*", ".js", ".jsx"]
+    },
+    output: {
+        path: path.resolve(__dirname, "dist/"),
+        publicPath: "/dist/",
+        filename: "bundle.js"
+    },
+    devServer: {
+        contentBase: path.join(__dirname, "public/"),
+        port: 3000,
+        publicPath: "http://localhost:3000/dist/",
+        hotOnly: true
+    },
+    devtool: 'eval-source-map',
+    plugins: [new webpack.HotModuleReplacementPlugin()]
 };

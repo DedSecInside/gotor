@@ -1,55 +1,41 @@
 package main
 
 import (
-	"./goBot"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
+
+	gobot "./goBot"
 )
 
-// Input respresents the input received from client
-type Input struct {
-	Website string `json:"website"`
-	Option  string `json:"option"`
-}
-
-// Output represents the JSON that will be served as response
-type Output struct {
-	Websites map[string]bool `json:"websites"`
-}
-
 func linksHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		// Receive user input
-		resp := Input{}
-		err := json.NewDecoder(r.Body).Decode(&resp)
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	if r.Method == "GET" {
+		website := r.URL.Query().Get("url")
+		links, err := gobot.GetLinks(website, "127.0.0.1", "9050", 60)
 		if err != nil {
-			log.Printf("Error: %v", err)
+			log.Printf("Unable to retrieve links for %s. Error: %v", website, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 
-		// If onion website then use Tor
-		var links map[string]bool
-		if !strings.Contains(resp.Website, ".onion") {
-			links, err = gobot.GetLinks(resp.Website, "", "", 15)
-		} else {
-			links, err = gobot.GetLinks(resp.Website, "127.0.0.1", "9050", 15)
-		}
-		if err != nil {
-			log.Printf("Error: %v", err)
-		}
-
-		// Serve Response
-		outResp := Output{Websites: links}
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		err = json.NewEncoder(w).Encode(&outResp)
+		err = json.NewEncoder(w).Encode(&links)
+		if err != nil {
+			log.Printf("Error: %+v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 }
 
 func main() {
-	http.HandleFunc("/LIVE", linksHandler)
-	fmt.Println("Serving on localhost:8008/LIVE")
-	log.Fatal(http.ListenAndServe(":8008", nil))
+	http.HandleFunc("/", linksHandler)
+	fmt.Println("Serving on localhost:3050")
+	log.Fatal(http.ListenAndServe(":3050", nil))
 }
