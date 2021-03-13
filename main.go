@@ -88,10 +88,8 @@ func readLinks(r io.Reader) []string {
 			token := tokenizer.Token()
 			for _, attr := range token.Attr {
 				if attr.Key == "href" {
-					if u, err := url.ParseRequestURI(attr.Val); err == nil {
-						if u.Scheme == "http" || u.Scheme == "https" {
-							links = append(links, attr.Val)
-						}
+					if u, err := url.ParseRequestURI(attr.Val); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+						links = append(links, attr.Val)
 					}
 				}
 			}
