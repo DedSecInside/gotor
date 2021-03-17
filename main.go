@@ -9,6 +9,8 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/mgutz/ansi"
+	"github.com/schollz/progressbar"
 	"golang.org/x/net/html"
 )
 
@@ -103,6 +105,11 @@ func main() {
 		log.Fatal(err)
 		return
 	}
+	if len(os.Args) < 2 {
+		log.Fatal("Requires more arguments.")
+		return
+	}
+
 	root := os.Args[1]
 	resp, err := client.Get(root)
 	if err != nil {
@@ -111,21 +118,30 @@ func main() {
 	}
 
 	links := readLinks(resp.Body)
-
+	bar := progressbar.Default(int64(len(links)), "Processing Links")
+	markError := ansi.ColorFunc("red")
+	markSuccess := ansi.ColorFunc("green")
 	t := newTable(&TableConfig{
 		MinWidth: 0,
-		TabWidth: 8,
+		TabWidth: 0,
 		Padding:  0,
 	})
 	t.AddRow([]string{"Link", "Status"})
 	for _, link := range links {
+		bar.Describe(fmt.Sprintf("Processing %s", link))
 		resp, err = client.Get(link)
 		if err != nil {
 			log.Fatal(err)
 			return
 		}
 		status := fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-		t.AddRow([]string{link, status})
+		if resp.StatusCode != 200 {
+			t.AddRow([]string{link, markError(status)})
+		} else {
+			t.AddRow([]string{link, markSuccess(status)})
+		}
+		bar.Add(1)
 	}
+	bar.IsFinished()
 	t.Display()
 }
