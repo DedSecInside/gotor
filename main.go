@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -100,18 +101,19 @@ func readLinks(r io.Reader) []string {
 }
 
 func main() {
+	var link string
+	flag.StringVar(&link, "l", "", "Link to be searched")
+	flag.Parse()
+	if link == "" {
+		log.Fatal("Requires more arguments.")
+		return
+	}
 	client, err := createTorClient()
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	if len(os.Args) < 2 {
-		log.Fatal("Requires more arguments.")
-		return
-	}
-
-	root := os.Args[1]
-	resp, err := client.Get(root)
+	resp, err := client.Get(link)
 	if err != nil {
 		log.Fatal(err)
 		return
