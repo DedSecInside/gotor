@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"text/tabwriter"
 
 	"github.com/mgutz/ansi"
@@ -102,12 +103,21 @@ func readLinks(r io.Reader) []string {
 
 func main() {
 	var link string
-	flag.StringVar(&link, "l", "", "Link to be searched")
+	var depthInput string
+	flag.StringVar(&link, "l", "", "Link to be searched. Requred.")
+	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1.")
 	flag.Parse()
 	if link == "" {
 		log.Fatal("Requires more arguments.")
 		return
 	}
+
+	depth, err := strconv.Atoi(depthInput)
+	if err != nil {
+		log.Fatal("Invalid depth found. Depth: ", depth)
+		return
+	}
+
 	client, err := createTorClient()
 	if err != nil {
 		log.Fatal(err)
