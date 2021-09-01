@@ -12,7 +12,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/mgutz/ansi"
-	"github.com/schollz/progressbar"
+	progressbar "github.com/schollz/progressbar/v3"
 	"golang.org/x/net/html"
 )
 
@@ -66,6 +66,8 @@ func (t *Table) Display() error {
 	return t.Writer.Flush()
 }
 
+// create a simple tor client, this can be modified to allow the user to
+// set their address and port at some point
 func createTorClient() (*http.Client, error) {
 	proxyStr := "socks5://127.0.0.1:9050"
 	proxyUrl, err := url.Parse(proxyStr)
@@ -80,9 +82,11 @@ func createTorClient() (*http.Client, error) {
 	}, nil
 }
 
-func readLinks(r io.Reader) []string {
+// parses the links from a reader
+func parseLinks(r io.Reader) []string {
 	links := make([]string, 0)
 	tokenizer := html.NewTokenizer(r)
+
 	for {
 		tokenType := tokenizer.Next()
 		switch tokenType {
@@ -104,11 +108,11 @@ func readLinks(r io.Reader) []string {
 func main() {
 	var link string
 	var depthInput string
-	flag.StringVar(&link, "l", "", "Link to be searched. Requred.")
+	flag.StringVar(&link, "l", "", "Root used for searching. Requred.")
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1.")
 	flag.Parse()
 	if link == "" {
-		log.Fatal("Requires more arguments.")
+		log.Fatal("-l (link) argument is required.")
 		return
 	}
 
@@ -129,8 +133,8 @@ func main() {
 		return
 	}
 
-	links := readLinks(resp.Body)
-	bar := progressbar.Default(int64(len(links)), "Processing Links")
+	links := parseLinks(resp.Body)
+	bar := progressbar.NewOptions(int(len(links)), progressbar.OptionSetDescription("processing..."))
 	markError := ansi.ColorFunc("red")
 	markSuccess := ansi.ColorFunc("green")
 	t := newTable(&TableConfig{
@@ -140,7 +144,7 @@ func main() {
 	})
 	t.AddRow([]string{"Link", "Status"})
 	for _, link := range links {
-		bar.Describe(fmt.Sprintf("Processing %s", link))
+		bar.Describe(fmt.Sprintf("processing %s", link))
 		resp, err = client.Get(link)
 		if err != nil {
 			log.Fatal(err)
@@ -155,5 +159,6 @@ func main() {
 		bar.Add(1)
 	}
 	bar.IsFinished()
+	bar.Clear()
 	t.Display()
 }
