@@ -58,6 +58,7 @@ func streamLinks(r io.Reader) chan string {
 	linkChan := make(chan string, 10)
 	tokenizer := html.NewTokenizer(r)
 	go func() {
+		defer close(linkChan)
 		for {
 			tokenType := tokenizer.Next()
 			switch tokenType {
@@ -66,7 +67,6 @@ func streamLinks(r io.Reader) chan string {
 				if err != io.EOF {
 					log.Fatal(err)
 				}
-				close(linkChan)
 				return
 			case html.StartTagToken:
 				token := tokenizer.Token()
