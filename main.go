@@ -54,10 +54,15 @@ func parseLinks(r io.Reader) ([]string, error) {
 }
 
 // parses the links from a reader
-func streamLinks(r io.Reader) chan string {
+func streamLinks(client *http.Client, link string) chan string {
 	linkChan := make(chan string, 10)
-	tokenizer := html.NewTokenizer(r)
 	go func() {
+		resp, err := client.Get(link)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		tokenizer := html.NewTokenizer(resp.Body)
 		defer close(linkChan)
 		for {
 			tokenType := tokenizer.Next()
@@ -94,11 +99,31 @@ func getStatus(client *http.Client, link string) (string, error) {
 	}
 	status := fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	if resp.StatusCode != 200 {
-		status = fmt.Sprintf("Link: %4s Status: %4s", link, markError((status)))
+		status = fmt.Sprintf("Link: %20s Status: %15s", link, markError((status)))
 	} else {
-		status = fmt.Sprintf("Link: %4s Status: %4s", link, markSuccess((status)))
+		status = fmt.Sprintf("Link: %20s Status: %15s", link, markSuccess((status)))
 	}
 	return status, nil
+}
+
+func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sync.WaitGroup) {
+	for link := range linkChan {
+		go func(l string) {
+			defer wg.Done()
+			status, err := getStatus(client, l)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			fmt.Println(status)
+			if depth != 0 {
+				depth--
+				subLinkChan := streamLinks(client, l)
+				streamStatus(client, subLinkChan, depth, wg)
+			}
+		}(link)
+		wg.Add(1)
+	}
 }
 
 func main() {
@@ -119,29 +144,8 @@ func main() {
 	}
 
 	client, err := createTorClient()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	resp, err := client.Get(link)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	linkChan := streamLinks(resp.Body)
+	linkChan := streamLinks(client, link)
 	wg := new(sync.WaitGroup)
-	for link := range linkChan {
-		go func(l string) {
-			defer wg.Done()
-			status, err := getStatus(client, l)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			fmt.Println(status)
-		}(link)
-		wg.Add(1)
-	}
+	streamStatus(client, linkChan, depth, wg)
 	wg.Wait()
 }
