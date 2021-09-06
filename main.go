@@ -7,75 +7,23 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
-	"text/tabwriter"
+	"sync"
 
 	"github.com/mgutz/ansi"
-	progressbar "github.com/schollz/progressbar/v3"
 	"golang.org/x/net/html"
 )
-
-// TableWriter can write to a table and display the output using the flush method
-type TableWriter interface {
-	Write([]byte) (int, error)
-	Flush() error
-}
-
-// TableConfig ...
-type TableConfig struct {
-	MinWidth int
-	TabWidth int
-	Padding  int
-}
-
-// Table ...
-type Table struct {
-	Writer TableWriter
-	Rows   [][]string
-}
-
-func newTable(c *TableConfig) *Table {
-	writer := tabwriter.NewWriter(os.Stdout, c.MinWidth, c.TabWidth, c.Padding, byte('\t'), tabwriter.Debug)
-	return &Table{
-		Writer: writer,
-		Rows:   make([][]string, 0),
-	}
-}
-
-// AddRow ...
-func (t *Table) AddRow(cellValues []string) error {
-	t.Rows = append(t.Rows, cellValues)
-	return nil
-}
-
-func (t *Table) formatRow(row []string) string {
-	formattedRow := ""
-	for _, cell := range row {
-		formattedRow += cell + "\t"
-	}
-	return formattedRow
-}
-
-// Display ...
-func (t *Table) Display() error {
-	for _, row := range t.Rows {
-		formattedRow := t.formatRow(row)
-		fmt.Fprintln(t.Writer, formattedRow)
-	}
-	return t.Writer.Flush()
-}
 
 // create a simple tor client, this can be modified to allow the user to
 // set their address and port at some point
 func createTorClient() (*http.Client, error) {
 	proxyStr := "socks5://127.0.0.1:9050"
-	proxyUrl, err := url.Parse(proxyStr)
+	proxyURL, err := url.Parse(proxyStr)
 	if err != nil {
 		return nil, err
 	}
 	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyUrl),
+		Proxy: http.ProxyURL(proxyURL),
 	}
 	return &http.Client{
 		Transport: transport,
@@ -83,7 +31,7 @@ func createTorClient() (*http.Client, error) {
 }
 
 // parses the links from a reader
-func parseLinks(r io.Reader) []string {
+func parseLinks(r io.Reader) ([]string, error) {
 	links := make([]string, 0)
 	tokenizer := html.NewTokenizer(r)
 
@@ -91,7 +39,7 @@ func parseLinks(r io.Reader) []string {
 		tokenType := tokenizer.Next()
 		switch tokenType {
 		case html.ErrorToken:
-			return links
+			return links, tokenizer.Err()
 		case html.StartTagToken:
 			token := tokenizer.Token()
 			for _, attr := range token.Attr {
@@ -102,6 +50,79 @@ func parseLinks(r io.Reader) []string {
 				}
 			}
 		}
+	}
+}
+
+// parses the links from a reader
+func streamLinks(client *http.Client, link string) chan string {
+	linkChan := make(chan string, 10)
+	go func() {
+		resp, err := client.Get(link)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		tokenizer := html.NewTokenizer(resp.Body)
+		defer close(linkChan)
+		for {
+			tokenType := tokenizer.Next()
+			switch tokenType {
+			case html.ErrorToken:
+				err := tokenizer.Err()
+				if err != io.EOF {
+					log.Fatal(err)
+				}
+				return
+			case html.StartTagToken:
+				token := tokenizer.Token()
+				for _, attr := range token.Attr {
+					if attr.Key == "href" {
+						if u, err := url.ParseRequestURI(attr.Val); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+							linkChan <- attr.Val
+						}
+					}
+				}
+			}
+		}
+	}()
+	return linkChan
+}
+
+func getStatus(client *http.Client, link string) (string, error) {
+	markError := ansi.ColorFunc("red")
+	markSuccess := ansi.ColorFunc("green")
+	fmt.Printf("Checking %s\n ", ansi.Color(link, "blue"))
+	resp, err := client.Get(link)
+	if err != nil {
+		log.Fatal(err)
+		return "", err
+	}
+	status := fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	if resp.StatusCode != 200 {
+		status = fmt.Sprintf("Link: %20s Status: %15s", link, markError((status)))
+	} else {
+		status = fmt.Sprintf("Link: %20s Status: %15s", link, markSuccess((status)))
+	}
+	return status, nil
+}
+
+func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sync.WaitGroup) {
+	for link := range linkChan {
+		go func(l string) {
+			defer wg.Done()
+			status, err := getStatus(client, l)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			fmt.Println(status)
+			if depth != 0 {
+				depth--
+				subLinkChan := streamLinks(client, l)
+				streamStatus(client, subLinkChan, depth, wg)
+			}
+		}(link)
+		wg.Add(1)
 	}
 }
 
@@ -123,42 +144,8 @@ func main() {
 	}
 
 	client, err := createTorClient()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	resp, err := client.Get(link)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	links := parseLinks(resp.Body)
-	bar := progressbar.NewOptions(int(len(links)), progressbar.OptionSetDescription("processing..."))
-	markError := ansi.ColorFunc("red")
-	markSuccess := ansi.ColorFunc("green")
-	t := newTable(&TableConfig{
-		MinWidth: 0,
-		TabWidth: 0,
-		Padding:  0,
-	})
-	t.AddRow([]string{"Link", "Status"})
-	for _, link := range links {
-		bar.Describe(fmt.Sprintf("processing %s", link))
-		resp, err = client.Get(link)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-		status := fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-		if resp.StatusCode != 200 {
-			t.AddRow([]string{link, markError(status)})
-		} else {
-			t.AddRow([]string{link, markSuccess(status)})
-		}
-		bar.Add(1)
-	}
-	bar.IsFinished()
-	bar.Clear()
-	t.Display()
+	linkChan := streamLinks(client, link)
+	wg := new(sync.WaitGroup)
+	streamStatus(client, linkChan, depth, wg)
+	wg.Wait()
 }
