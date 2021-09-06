@@ -18,12 +18,12 @@ import (
 // set their address and port at some point
 func createTorClient() (*http.Client, error) {
 	proxyStr := "socks5://127.0.0.1:9050"
-	proxyUrl, err := url.Parse(proxyStr)
+	proxyURL, err := url.Parse(proxyStr)
 	if err != nil {
 		return nil, err
 	}
 	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyUrl),
+		Proxy: http.ProxyURL(proxyURL),
 	}
 	return &http.Client{
 		Transport: transport,
