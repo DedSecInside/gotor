@@ -14,10 +14,9 @@ import (
 	"golang.org/x/net/html"
 )
 
-// create a simple tor client, this can be modified to allow the user to
-// set their address and port at some point
-func createTorClient() (*http.Client, error) {
-	proxyStr := "socks5://127.0.0.1:9050"
+// creates a http client using socks5 proxy
+func createTorClient(host, port string) (*http.Client, error) {
+	proxyStr := fmt.Sprintf("socks5://%s:%s", host, port)
 	proxyURL, err := url.Parse(proxyStr)
 	if err != nil {
 		return nil, err
@@ -30,30 +29,7 @@ func createTorClient() (*http.Client, error) {
 	}, nil
 }
 
-// parses the links from a reader
-func parseLinks(r io.Reader) ([]string, error) {
-	links := make([]string, 0)
-	tokenizer := html.NewTokenizer(r)
-
-	for {
-		tokenType := tokenizer.Next()
-		switch tokenType {
-		case html.ErrorToken:
-			return links, tokenizer.Err()
-		case html.StartTagToken:
-			token := tokenizer.Token()
-			for _, attr := range token.Attr {
-				if attr.Key == "href" {
-					if u, err := url.ParseRequestURI(attr.Val); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-						links = append(links, attr.Val)
-					}
-				}
-			}
-		}
-	}
-}
-
-// parses the links from a reader
+// streams the child nodes of a link
 func streamLinks(client *http.Client, link string) chan string {
 	linkChan := make(chan string, 10)
 	go func() {
@@ -88,6 +64,7 @@ func streamLinks(client *http.Client, link string) chan string {
 	return linkChan
 }
 
+// returns a formatted string of the HTTP status for the link
 func getStatus(client *http.Client, link string) (string, error) {
 	markError := ansi.ColorFunc("red")
 	markSuccess := ansi.ColorFunc("green")
@@ -106,6 +83,7 @@ func getStatus(client *http.Client, link string) (string, error) {
 	return status, nil
 }
 
+// streams the status of the links from the channel until the depth has reached 0
 func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sync.WaitGroup) {
 	for link := range linkChan {
 		go func(l string) {
@@ -116,7 +94,7 @@ func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sy
 				return
 			}
 			fmt.Println(status)
-			if depth != 0 {
+			if depth > 0 {
 				depth--
 				subLinkChan := streamLinks(client, l)
 				streamStatus(client, subLinkChan, depth, wg)
@@ -128,9 +106,13 @@ func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sy
 
 func main() {
 	var link string
+	var host string
+	var port string
 	var depthInput string
-	flag.StringVar(&link, "l", "", "Root used for searching. Requred.")
+	flag.StringVar(&link, "l", "", "Root used for searching. Required.")
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1.")
+	flag.StringVar(&host, "h", "127.0.0.1", "The address used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
 	flag.Parse()
 	if link == "" {
 		log.Fatal("-l (link) argument is required.")
@@ -143,7 +125,7 @@ func main() {
 		return
 	}
 
-	client, err := createTorClient()
+	client, err := createTorClient(host, port)
 	linkChan := streamLinks(client, link)
 	wg := new(sync.WaitGroup)
 	streamStatus(client, linkChan, depth, wg)
