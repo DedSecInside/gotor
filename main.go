@@ -111,7 +111,7 @@ func main() {
 	var depthInput string
 	flag.StringVar(&link, "l", "", "Root used for searching. Required. (Must be a valid URL)")
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
-	flag.StringVar(&host, "h", "127.0.0.1", "The address used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
 	flag.Parse()
 	if link == "" {
@@ -126,6 +126,11 @@ func main() {
 	}
 
 	client, err := createTorClient(host, port)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
 	linkChan := streamLinks(client, link)
 	wg := new(sync.WaitGroup)
 	streamStatus(client, linkChan, depth, wg)
