@@ -109,19 +109,19 @@ func main() {
 	var host string
 	var port string
 	var depthInput string
-	flag.StringVar(&link, "l", "", "Root used for searching. Required.")
-	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1.")
+	flag.StringVar(&link, "l", "", "Root used for searching. Required. (Must be a valid URL)")
+	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 	flag.StringVar(&host, "h", "127.0.0.1", "The address used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
 	flag.Parse()
 	if link == "" {
-		log.Fatal("-l (link) argument is required.")
+		flag.CommandLine.Usage()
 		return
 	}
 
 	depth, err := strconv.Atoi(depthInput)
 	if err != nil {
-		log.Fatal("Invalid depth found. Depth: ", depth)
+		flag.CommandLine.Usage()
 		return
 	}
 
