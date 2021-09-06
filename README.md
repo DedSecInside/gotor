@@ -2,7 +2,7 @@
 
 This is TorBot ported to Golang. 
 
-Currently the only supported functionality is the basic link lookup. If you iput a website name when executing the main file, you'll see the links found on the page and their current status. 
-```
-go run main.go https://www.youtube.com
-```
+Supported functionality:
+- Searching for children nodes of links (depth can be configured, is defaulted to 1)
+
+[![asciicast](https://asciinema.org/a/6DdaqGdUywBD0AexurcTXzEv4.svg)](https://asciinema.org/a/6DdaqGdUywBD0AexurcTXzEv4)
