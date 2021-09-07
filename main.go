@@ -45,7 +45,7 @@ func (l *LinkNode) UpdateStatus() {
 }
 
 // creates a http client using socks5 proxy
-func createTorClient(host, port string) (*http.Client, error) {
+func newTorClient(host, port string) (*http.Client, error) {
 	proxyStr := fmt.Sprintf("socks5://%s:%s", host, port)
 	proxyURL, err := url.Parse(proxyStr)
 	if err != nil {
@@ -207,7 +207,7 @@ func main() {
 		return
 	}
 
-	client, err := createTorClient(host, port)
+	client, err := newTorClient(host, port)
 	if err != nil {
 		log.Fatal(err)
 		return
