@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -8,8 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/gorilla/mux"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/net/html"
@@ -18,9 +21,10 @@ import (
 // LinkNode ...
 type LinkNode struct {
 	client     *http.Client
-	URL        string
-	StatusCode int
-	Status     string
+	URL        string      `json:"url"`
+	StatusCode int         `json:"status_code"`
+	Status     string      `json:"status"`
+	Children   []*LinkNode `json:"children"`
 }
 
 func newNode(client *http.Client, link string) *LinkNode {
@@ -110,6 +114,33 @@ func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.Wait
 	}
 }
 
+// streams the status of the links from the channel until the depth has reached 0
+func buildTree(linkChan <-chan string, depth int, wg *sync.WaitGroup, node *LinkNode) {
+	for link := range linkChan {
+		go func(l string) {
+			defer wg.Done()
+			n := newNode(node.client, l)
+			node.Children = append(node.Children, n)
+			if depth > 0 {
+				depth--
+				subLinkChan := streamLinks(node.client, l)
+				buildTree(subLinkChan, depth, wg, n)
+			}
+		}(link)
+		wg.Add(1)
+	}
+}
+
+func printTree(n *LinkNode) {
+	fmt.Printf("%s has %d children.\n", n.URL, len(n.Children))
+	for _, child := range n.Children {
+		fmt.Printf("- %s\n", child.URL)
+	}
+	for _, child := range n.Children {
+		printTree(child)
+	}
+}
+
 // Crawler ...
 type Crawler struct {
 	client   *http.Client
@@ -182,18 +213,72 @@ func writeExcel(crawler *Crawler, depth int, filename string) {
 	}
 }
 
+func runServer(host, port string) {
+	router := mux.NewRouter()
+
+	client, err := newTorClient(host, port)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	router.HandleFunc("/children", func(w http.ResponseWriter, r *http.Request) {
+		queryMap := r.URL.Query()
+		// decode depth
+		depthInput := queryMap.Get("depth")
+		depth, err := strconv.Atoi(depthInput)
+		if err != nil {
+			_, err := w.Write([]byte("Invalid depth. Must be an integer."))
+			if err != nil {
+				log.Println(err.Error())
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		link := queryMap.Get("link")
+		linkChan := streamLinks(client, link)
+		crawler := newCrawler(client, linkChan)
+		node := newNode(client, link)
+		buildTree(linkChan, depth, crawler.wg, node)
+		crawler.wg.Wait()
+
+		err = json.NewEncoder(w).Encode(node)
+		if err != nil {
+			log.Println("Unable to encode the link node. Error: %+v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}).Methods(http.MethodGet)
+
+	err = http.ListenAndServe(":8080", router)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+}
+
 func main() {
 	var root string
 	var host string
 	var port string
 	var depthInput string
 	var output string
+	var serve string
 	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
 	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal.")
+	flag.StringVar(&serve, "s", "no", "The method of output being used. Defaults to terminal.")
 	flag.Parse()
+
+	// If the server flag is passed then all other flags are ignored.
+	if strings.ToLower(serve) != "no" {
+		runServer(host, port)
+		return
+	}
+
 	if root == "" {
 		flag.CommandLine.Usage()
 		return
@@ -224,5 +309,10 @@ func main() {
 		}
 		filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
 		writeExcel(crawler, depth, filename)
+	case "tree":
+		r := newNode(client, root)
+		buildTree(linkChan, depth, crawler.wg, r)
+		crawler.wg.Wait()
+		printTree(r)
 	}
 }
