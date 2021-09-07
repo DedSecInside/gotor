@@ -118,13 +118,11 @@ type Crawler struct {
 }
 
 func newCrawler(client *http.Client, linkChan chan string) *Crawler {
-	crawler := &Crawler{
+	return &Crawler{
 		client:   client,
 		linkChan: linkChan,
+		wg:       new(sync.WaitGroup),
 	}
-	wg := new(sync.WaitGroup)
-	crawler.wg = wg
-	return crawler
 }
 
 // Crawl ...
