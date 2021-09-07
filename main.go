@@ -110,6 +110,80 @@ func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.Wait
 	}
 }
 
+// Crawler ...
+type Crawler struct {
+	client   *http.Client
+	linkChan chan string
+	wg       *sync.WaitGroup
+}
+
+func newCrawler(client *http.Client, linkChan chan string) *Crawler {
+	crawler := &Crawler{
+		client:   client,
+		linkChan: linkChan,
+	}
+	wg := new(sync.WaitGroup)
+	crawler.wg = wg
+	return crawler
+}
+
+// Crawl ...
+func (c *Crawler) Crawl(work func(link string), depth int) {
+	crawl(c.client, c.linkChan, depth, c.wg, work)
+	c.wg.Wait()
+}
+
+func writeTerminal(crawler *Crawler, depth int) {
+	printStatus := func(link string) {
+		l := newNode(crawler.client, link)
+		markError := ansi.ColorFunc("red")
+		markSuccess := ansi.ColorFunc("green")
+		if l.StatusCode != 200 {
+			fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markError(l.Status))
+		} else {
+			fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markSuccess(l.Status))
+		}
+	}
+	crawler.Crawl(printStatus, depth)
+}
+
+func writeExcel(crawler *Crawler, depth int, filename string) {
+	f := excelize.NewFile()
+	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	err = f.SetCellStr(f.GetSheetName(0), "B1", "Status")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	row := 2
+	addRow := func(link string) {
+		node := newNode(crawler.client, link)
+		linkCell := fmt.Sprintf("A%d", row)
+		statusCell := fmt.Sprintf("B%d", row)
+		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		err = f.SetCellStr(f.GetSheetName(0), statusCell, fmt.Sprintf("%d %s", node.StatusCode, node.Status))
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		row++
+	}
+	crawler.Crawl(addRow, depth)
+	err = f.SaveAs(filename)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+}
+
 func main() {
 	var root string
 	var host string
@@ -140,61 +214,17 @@ func main() {
 	}
 
 	linkChan := streamLinks(client, root)
-	wg := new(sync.WaitGroup)
+	crawler := newCrawler(client, linkChan)
 	switch output {
 	case "terminal":
-		printStatus := func(link string) {
-			l := newNode(client, link)
-			markError := ansi.ColorFunc("red")
-			markSuccess := ansi.ColorFunc("green")
-			if l.StatusCode != 200 {
-				fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markError(l.Status))
-			} else {
-				fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markSuccess(l.Status))
-			}
-		}
-		crawl(client, linkChan, depth, wg, printStatus)
-		wg.Wait()
+		writeTerminal(crawler, depth)
 	case "excel":
-		f := excelize.NewFile()
-		err = f.SetCellStr(f.GetSheetName(0), "A1", "Link")
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-		err = f.SetCellStr(f.GetSheetName(0), "B1", "Status")
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-		row := 2
-		addRow := func(link string) {
-			node := newNode(client, link)
-			linkCell := fmt.Sprintf("A%d", row)
-			statusCell := fmt.Sprintf("B%d", row)
-			err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			err = f.SetCellStr(f.GetSheetName(0), statusCell, fmt.Sprintf("%d %s", node.StatusCode, node.Status))
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			row++
-		}
-		crawl(client, linkChan, depth, wg, addRow)
-		wg.Wait()
 		u, err := url.Parse(root)
 		if err != nil {
 			log.Fatal(err)
 			return
 		}
-		err = f.SaveAs(fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth))
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
+		filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
+		writeExcel(crawler, depth, filename)
 	}
 }
