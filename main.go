@@ -85,10 +85,12 @@ func streamLinks(client *http.Client, link string) chan string {
 				return
 			case html.StartTagToken:
 				token := tokenizer.Token()
-				for _, attr := range token.Attr {
-					if attr.Key == "href" {
-						if u, err := url.ParseRequestURI(attr.Val); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-							linkChan <- attr.Val
+				if token.Data == "a" {
+					for _, attr := range token.Attr {
+						if attr.Key == "href" {
+							if u, err := url.ParseRequestURI(attr.Val); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+								linkChan <- attr.Val
+							}
 						}
 					}
 				}
