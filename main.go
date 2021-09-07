@@ -11,8 +11,38 @@ import (
 	"sync"
 
 	"github.com/mgutz/ansi"
+	"github.com/xuri/excelize/v2"
 	"golang.org/x/net/html"
 )
+
+// LinkNode ...
+type LinkNode struct {
+	client     *http.Client
+	URL        string
+	StatusCode int
+	Status     string
+}
+
+func newNode(client *http.Client, link string) *LinkNode {
+	l := &LinkNode{
+		URL:    link,
+		client: client,
+	}
+	l.UpdateStatus()
+	return l
+}
+
+// UpdateStatus ...
+func (l *LinkNode) UpdateStatus() {
+	fmt.Printf("Checking %s\n ", ansi.Color(l.URL, "blue"))
+	resp, err := l.client.Get(l.URL)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	l.Status = http.StatusText(resp.StatusCode)
+	l.StatusCode = resp.StatusCode
+}
 
 // creates a http client using socks5 proxy
 func createTorClient(host, port string) (*http.Client, error) {
@@ -64,40 +94,16 @@ func streamLinks(client *http.Client, link string) chan string {
 	return linkChan
 }
 
-// returns a formatted string of the HTTP status for the link
-func getStatus(client *http.Client, link string) (string, error) {
-	markError := ansi.ColorFunc("red")
-	markSuccess := ansi.ColorFunc("green")
-	fmt.Printf("Checking %s\n ", ansi.Color(link, "blue"))
-	resp, err := client.Get(link)
-	if err != nil {
-		log.Fatal(err)
-		return "", err
-	}
-	status := fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-	if resp.StatusCode != 200 {
-		status = fmt.Sprintf("Link: %20s Status: %15s", link, markError((status)))
-	} else {
-		status = fmt.Sprintf("Link: %20s Status: %15s", link, markSuccess((status)))
-	}
-	return status, nil
-}
-
 // streams the status of the links from the channel until the depth has reached 0
-func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sync.WaitGroup) {
+func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.WaitGroup, doWork func(link string)) {
 	for link := range linkChan {
 		go func(l string) {
 			defer wg.Done()
-			status, err := getStatus(client, l)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			fmt.Println(status)
+			doWork(l)
 			if depth > 0 {
 				depth--
 				subLinkChan := streamLinks(client, l)
-				streamStatus(client, subLinkChan, depth, wg)
+				crawl(client, subLinkChan, depth, wg, doWork)
 			}
 		}(link)
 		wg.Add(1)
@@ -105,16 +111,18 @@ func streamStatus(client *http.Client, linkChan <-chan string, depth int, wg *sy
 }
 
 func main() {
-	var link string
+	var root string
 	var host string
 	var port string
 	var depthInput string
-	flag.StringVar(&link, "l", "", "Root used for searching. Required. (Must be a valid URL)")
+	var output string
+	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
+	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal.")
 	flag.Parse()
-	if link == "" {
+	if root == "" {
 		flag.CommandLine.Usage()
 		return
 	}
@@ -131,8 +139,62 @@ func main() {
 		return
 	}
 
-	linkChan := streamLinks(client, link)
+	linkChan := streamLinks(client, root)
 	wg := new(sync.WaitGroup)
-	streamStatus(client, linkChan, depth, wg)
-	wg.Wait()
+	switch output {
+	case "terminal":
+		printStatus := func(link string) {
+			l := newNode(client, link)
+			markError := ansi.ColorFunc("red")
+			markSuccess := ansi.ColorFunc("green")
+			if l.StatusCode != 200 {
+				fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markError(l.Status))
+			} else {
+				fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markSuccess(l.Status))
+			}
+		}
+		crawl(client, linkChan, depth, wg, printStatus)
+		wg.Wait()
+	case "excel":
+		f := excelize.NewFile()
+		err = f.SetCellStr(f.GetSheetName(0), "A1", "Link")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		err = f.SetCellStr(f.GetSheetName(0), "B1", "Status")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		row := 2
+		addRow := func(link string) {
+			node := newNode(client, link)
+			linkCell := fmt.Sprintf("A%d", row)
+			statusCell := fmt.Sprintf("B%d", row)
+			err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			err = f.SetCellStr(f.GetSheetName(0), statusCell, fmt.Sprintf("%d %s", node.StatusCode, node.Status))
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			row++
+		}
+		crawl(client, linkChan, depth, wg, addRow)
+		wg.Wait()
+		u, err := url.Parse(root)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		err = f.SaveAs(fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth))
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+	}
 }
