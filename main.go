@@ -35,12 +35,18 @@ func newNode(client *http.Client, link string) *LinkNode {
 	return l
 }
 
+func printErr(err error) {
+	fmt.Println(ansi.Color(err.Error(), ansi.Red))
+}
+
 // UpdateStatus ...
 func (l *LinkNode) UpdateStatus() {
 	fmt.Printf("Checking %s\n ", ansi.Color(l.URL, "blue"))
 	resp, err := l.client.Get(l.URL)
 	if err != nil {
-		log.Fatal(err)
+		printErr(err)
+		l.Status = "UNKNOWN"
+		l.StatusCode = http.StatusInternalServerError
 		return
 	}
 	l.Status = http.StatusText(resp.StatusCode)
@@ -64,7 +70,7 @@ func newTorClient(host, port string) (*http.Client, error) {
 
 // streams the child nodes of a link
 func streamLinks(client *http.Client, link string) chan string {
-	linkChan := make(chan string, 10)
+	linkChan := make(chan string, 100)
 	go func() {
 		resp, err := client.Get(link)
 		if err != nil {
@@ -97,6 +103,33 @@ func streamLinks(client *http.Client, link string) chan string {
 		}
 	}()
 	return linkChan
+}
+
+// streams the child nodes of a link
+func getTorIP(client *http.Client) (string, error) {
+	resp, err := client.Get("https://check.torproject.org/")
+	if err != nil {
+		return "", err
+	}
+	tokenizer := html.NewTokenizer(resp.Body)
+	for {
+		tokenType := tokenizer.Next()
+		switch tokenType {
+		case html.ErrorToken:
+			err := tokenizer.Err()
+			if err != io.EOF {
+				return "", err
+			}
+			return "", nil
+		case html.StartTagToken:
+			token := tokenizer.Token()
+			if token.Data == "strong" {
+				tokenizer.Next()
+				ip_token := tokenizer.Token()
+				return ip_token.Data, nil
+			}
+		}
+	}
 }
 
 // streams the status of the links from the channel until the depth has reached 0
@@ -226,6 +259,23 @@ func runServer(host, port string) {
 		return
 	}
 
+	router.HandleFunc("/ip", func(w http.ResponseWriter, r *http.Request) {
+		ip, err := getTorIP(client)
+		if err != nil {
+			_, err = w.Write([]byte(err.Error()))
+			if err != nil {
+				printErr(err)
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write([]byte(ip))
+		if err != nil {
+			printErr(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}).Methods(http.MethodGet)
 	router.HandleFunc("/children", func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
 		// decode depth
