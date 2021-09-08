@@ -120,7 +120,6 @@ func buildTree(linkChan <-chan string, depth int, wg *sync.WaitGroup, node *Link
 	for link := range linkChan {
 		go func(l string, node *LinkNode) {
 			defer wg.Done()
-			fmt.Printf("Parent: %s Child: %s Depth: %d\n", node.URL, l, depth)
 			// Do not add the link as it's own child
 			if node.URL != l {
 				n := newNode(node.client, l)
