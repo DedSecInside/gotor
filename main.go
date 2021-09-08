@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -106,7 +105,7 @@ func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.Wait
 		go func(l string) {
 			defer wg.Done()
 			doWork(l)
-			if depth > 0 {
+			if depth > 1 {
 				depth--
 				subLinkChan := streamLinks(client, l)
 				crawl(client, subLinkChan, depth, wg, doWork)
@@ -119,16 +118,20 @@ func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.Wait
 // streams the status of the links from the channel until the depth has reached 0
 func buildTree(linkChan <-chan string, depth int, wg *sync.WaitGroup, node *LinkNode) {
 	for link := range linkChan {
-		go func(l string) {
+		go func(l string, node *LinkNode) {
 			defer wg.Done()
-			n := newNode(node.client, l)
-			node.Children = append(node.Children, n)
-			if depth > 0 {
-				depth--
-				subLinkChan := streamLinks(node.client, l)
-				buildTree(subLinkChan, depth, wg, n)
+			fmt.Printf("Parent: %s Child: %s Depth: %d\n", node.URL, l, depth)
+			// Do not add the link as it's own child
+			if node.URL != l {
+				n := newNode(node.client, l)
+				node.Children = append(node.Children, n)
+				if depth > 1 {
+					depth--
+					subLinkChan := streamLinks(node.client, l)
+					buildTree(subLinkChan, depth, wg, n)
+				}
 			}
-		}(link)
+		}(link, node)
 		wg.Add(1)
 	}
 }
@@ -239,21 +242,24 @@ func runServer(host, port string) {
 		}
 
 		link := queryMap.Get("link")
+		log.Printf("processing link %s at a depth of %d\n", link, depth)
 		linkChan := streamLinks(client, link)
 		crawler := newCrawler(client, linkChan)
 		node := newNode(client, link)
 		buildTree(linkChan, depth, crawler.wg, node)
 		crawler.wg.Wait()
 
+		log.Printf("tree built: %+v\n", node)
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Println("Unable to encode the link node. Error: %+v", err)
+			log.Printf("Unable to encode the link node. Error: %+v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}).Methods(http.MethodGet)
 
-	err = http.ListenAndServe(":8080", router)
+	log.Println("Listening on port 8081")
+	err = http.ListenAndServe(":8081", router)
 	if err != nil {
 		log.Println(err)
 		return
@@ -266,17 +272,17 @@ func main() {
 	var port string
 	var depthInput string
 	var output string
-	var serve string
+	var serve bool
 	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
 	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal.")
-	flag.StringVar(&serve, "s", "no", "The method of output being used. Defaults to terminal.")
+	flag.BoolVar(&serve, "server", false, "Determines if the program will behave as an HTTP server.")
 	flag.Parse()
 
 	// If the server flag is passed then all other flags are ignored.
-	if strings.ToLower(serve) != "no" {
+	if serve {
 		runServer(host, port)
 		return
 	}
