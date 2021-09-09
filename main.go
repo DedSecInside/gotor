@@ -9,31 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 
+	"github.com/KingAkeem/gotor/linktree"
 	"github.com/gorilla/mux"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/net/html"
 )
-
-// LinkNode ...
-type LinkNode struct {
-	client     *http.Client
-	URL        string      `json:"url"`
-	StatusCode int         `json:"status_code"`
-	Status     string      `json:"status"`
-	Children   []*LinkNode `json:"children"`
-}
-
-func newNode(client *http.Client, link string) *LinkNode {
-	l := &LinkNode{
-		URL:    link,
-		client: client,
-	}
-	l.UpdateStatus()
-	return l
-}
 
 func logInfo(msg string) {
 	log.Println(ansi.Color(msg, "blue"))
@@ -41,20 +23,6 @@ func logInfo(msg string) {
 
 func logErr(err error) {
 	log.Println(ansi.Color(err.Error(), "red"))
-}
-
-// UpdateStatus ...
-func (l *LinkNode) UpdateStatus() {
-	logInfo(fmt.Sprintf("Updating status of %s", l.URL))
-	resp, err := l.client.Get(l.URL)
-	if err != nil {
-		logErr(err)
-		l.Status = "UNKNOWN"
-		l.StatusCode = http.StatusInternalServerError
-		return
-	}
-	l.Status = http.StatusText(resp.StatusCode)
-	l.StatusCode = resp.StatusCode
 }
 
 // creates a http client using socks5 proxy
@@ -70,43 +38,6 @@ func newTorClient(host, port string) (*http.Client, error) {
 	return &http.Client{
 		Transport: transport,
 	}, nil
-}
-
-// streams the child nodes of a link
-func streamLinks(client *http.Client, link string) chan string {
-	linkChan := make(chan string, 100)
-	go func() {
-		resp, err := client.Get(link)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-		tokenizer := html.NewTokenizer(resp.Body)
-		defer close(linkChan)
-		for {
-			tokenType := tokenizer.Next()
-			switch tokenType {
-			case html.ErrorToken:
-				err := tokenizer.Err()
-				if err != io.EOF {
-					log.Fatal(err)
-				}
-				return
-			case html.StartTagToken:
-				token := tokenizer.Token()
-				if token.Data == "a" {
-					for _, attr := range token.Attr {
-						if attr.Key == "href" {
-							if u, err := url.ParseRequestURI(attr.Val); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-								linkChan <- attr.Val
-							}
-						}
-					}
-				}
-			}
-		}
-	}()
-	return linkChan
 }
 
 // streams the child nodes of a link
@@ -136,88 +67,21 @@ func getTorIP(client *http.Client) (string, error) {
 	}
 }
 
-// streams the status of the links from the channel until the depth has reached 0
-func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.WaitGroup, doWork func(link string)) {
-	for link := range linkChan {
-		go func(l string) {
-			defer wg.Done()
-			doWork(l)
-			if depth > 1 {
-				depth--
-				subLinkChan := streamLinks(client, l)
-				crawl(client, subLinkChan, depth, wg, doWork)
-			}
-		}(link)
-		wg.Add(1)
-	}
-}
-
-// builds a tree from the given link channel
-func buildTree(linkChan <-chan string, depth int, wg *sync.WaitGroup, node *LinkNode) {
-	for link := range linkChan {
-		go func(l string, node *LinkNode) {
-			defer wg.Done()
-			// Do not add the link as it's own child
-			if node.URL != l {
-				n := newNode(node.client, l)
-				node.Children = append(node.Children, n)
-				if depth > 1 {
-					depth--
-					subLinkChan := streamLinks(node.client, l)
-					buildTree(subLinkChan, depth, wg, n)
-				}
-			}
-		}(link, node)
-		wg.Add(1)
-	}
-}
-
-func printTree(n *LinkNode) {
-	fmt.Printf("%s has %d children.\n", n.URL, len(n.Children))
-	for _, child := range n.Children {
-		fmt.Printf("- %s\n", child.URL)
-	}
-	for _, child := range n.Children {
-		printTree(child)
-	}
-}
-
-// Crawler ...
-type Crawler struct {
-	client   *http.Client
-	linkChan chan string
-	wg       *sync.WaitGroup
-}
-
-func newCrawler(client *http.Client, linkChan chan string) *Crawler {
-	return &Crawler{
-		client:   client,
-		linkChan: linkChan,
-		wg:       new(sync.WaitGroup),
-	}
-}
-
-// Crawl ...
-func (c *Crawler) Crawl(work func(link string), depth int) {
-	crawl(c.client, c.linkChan, depth, c.wg, work)
-	c.wg.Wait()
-}
-
-func writeTerminal(crawler *Crawler, depth int) {
+func writeTerminal(manager *linktree.NodeManager, root string, depth int) {
 	printStatus := func(link string) {
-		l := newNode(crawler.client, link)
+		n := linktree.NewNode(manager, link)
 		markError := ansi.ColorFunc("red")
 		markSuccess := ansi.ColorFunc("green")
-		if l.StatusCode != 200 {
-			fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markError(l.Status))
+		if n.StatusCode != 200 {
+			fmt.Printf("Link: %20s Status: %d %s\n", n.URL, n.StatusCode, markError(n.Status))
 		} else {
-			fmt.Printf("Link: %20s Status: %d %s\n", l.URL, l.StatusCode, markSuccess(l.Status))
+			fmt.Printf("Link: %20s Status: %d %s\n", n.URL, n.StatusCode, markSuccess(n.Status))
 		}
 	}
-	crawler.Crawl(printStatus, depth)
+	manager.Crawl(root, depth, printStatus)
 }
 
-func writeExcel(crawler *Crawler, depth int, filename string) {
+func writeExcel(manager *linktree.NodeManager, root string, depth int) {
 	f := excelize.NewFile()
 	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
 	if err != nil {
@@ -231,7 +95,7 @@ func writeExcel(crawler *Crawler, depth int, filename string) {
 	}
 	row := 2
 	addRow := func(link string) {
-		node := newNode(crawler.client, link)
+		node := linktree.NewNode(manager, link)
 		linkCell := fmt.Sprintf("A%d", row)
 		statusCell := fmt.Sprintf("B%d", row)
 		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
@@ -246,7 +110,13 @@ func writeExcel(crawler *Crawler, depth int, filename string) {
 		}
 		row++
 	}
-	crawler.Crawl(addRow, depth)
+	manager.Crawl(root, depth, addRow)
+	u, err := url.Parse(root)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
 	err = f.SaveAs(filename)
 	if err != nil {
 		log.Fatal(err)
@@ -296,12 +166,8 @@ func runServer(host, port string) {
 
 		link := queryMap.Get("link")
 		logInfo(fmt.Sprintf("processing link %s at a depth of %d", link, depth))
-		linkChan := streamLinks(client, link)
-		crawler := newCrawler(client, linkChan)
-		node := newNode(client, link)
-		buildTree(linkChan, depth, crawler.wg, node)
-		crawler.wg.Wait()
-
+		manager := linktree.NewNodeManager(client)
+		node := manager.LoadNode(link, depth)
 		logInfo(fmt.Sprintf("Tree built for %s at depth %d", node.URL, depth))
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
@@ -357,23 +223,14 @@ func main() {
 		return
 	}
 
-	linkChan := streamLinks(client, root)
-	crawler := newCrawler(client, linkChan)
+	manager := linktree.NewNodeManager(client)
 	switch output {
 	case "terminal":
-		writeTerminal(crawler, depth)
+		writeTerminal(manager, root, depth)
 	case "excel":
-		u, err := url.Parse(root)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-		filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
-		writeExcel(crawler, depth, filename)
+		writeExcel(manager, root, depth)
 	case "tree":
-		r := newNode(client, root)
-		buildTree(linkChan, depth, crawler.wg, r)
-		crawler.wg.Wait()
-		printTree(r)
+		node := manager.LoadNode(root, depth)
+		node.PrintTree()
 	}
 }
