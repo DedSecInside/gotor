@@ -70,20 +70,20 @@ func isValidURL(URL string) bool {
 func (m *NodeManager) streamUrls(link string) chan string {
 	linkChan := make(chan string, 100)
 	go func() {
+		defer close(linkChan)
 		resp, err := m.client.Get(link)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 			return
 		}
 		tokenizer := html.NewTokenizer(resp.Body)
-		defer close(linkChan)
 		for {
 			tokenType := tokenizer.Next()
 			switch tokenType {
 			case html.ErrorToken:
 				err := tokenizer.Err()
 				if err != io.EOF {
-					log.Fatal(err)
+					log.Println(err)
 				}
 				return
 			case html.StartTagToken:
