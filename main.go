@@ -35,16 +35,20 @@ func newNode(client *http.Client, link string) *LinkNode {
 	return l
 }
 
-func printErr(err error) {
-	fmt.Println(ansi.Color(err.Error(), ansi.Red))
+func logInfo(msg string) {
+	log.Println(ansi.Color(msg, "blue"))
+}
+
+func logErr(err error) {
+	log.Println(ansi.Color(err.Error(), "red"))
 }
 
 // UpdateStatus ...
 func (l *LinkNode) UpdateStatus() {
-	fmt.Printf("Checking %s\n ", ansi.Color(l.URL, "blue"))
+	logInfo(fmt.Sprintf("Updating status of %s", l.URL))
 	resp, err := l.client.Get(l.URL)
 	if err != nil {
-		printErr(err)
+		logErr(err)
 		l.Status = "UNKNOWN"
 		l.StatusCode = http.StatusInternalServerError
 		return
@@ -125,8 +129,8 @@ func getTorIP(client *http.Client) (string, error) {
 			token := tokenizer.Token()
 			if token.Data == "strong" {
 				tokenizer.Next()
-				ip_token := tokenizer.Token()
-				return ip_token.Data, nil
+				ipToken := tokenizer.Token()
+				return ipToken.Data, nil
 			}
 		}
 	}
@@ -148,7 +152,7 @@ func crawl(client *http.Client, linkChan <-chan string, depth int, wg *sync.Wait
 	}
 }
 
-// streams the status of the links from the channel until the depth has reached 0
+// builds a tree from the given link channel
 func buildTree(linkChan <-chan string, depth int, wg *sync.WaitGroup, node *LinkNode) {
 	for link := range linkChan {
 		go func(l string, node *LinkNode) {
@@ -264,14 +268,14 @@ func runServer(host, port string) {
 		if err != nil {
 			_, err = w.Write([]byte(err.Error()))
 			if err != nil {
-				printErr(err)
+				logErr(err)
 			}
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		_, err = w.Write([]byte(ip))
 		if err != nil {
-			printErr(err)
+			logErr(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -284,33 +288,33 @@ func runServer(host, port string) {
 		if err != nil {
 			_, err := w.Write([]byte("Invalid depth. Must be an integer."))
 			if err != nil {
-				log.Println(err.Error())
+				logErr(err)
 			}
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		link := queryMap.Get("link")
-		log.Printf("processing link %s at a depth of %d\n", link, depth)
+		logInfo(fmt.Sprintf("processing link %s at a depth of %d", link, depth))
 		linkChan := streamLinks(client, link)
 		crawler := newCrawler(client, linkChan)
 		node := newNode(client, link)
 		buildTree(linkChan, depth, crawler.wg, node)
 		crawler.wg.Wait()
 
-		log.Printf("tree built: %+v\n", node)
+		logInfo(fmt.Sprintf("Tree built for %s at depth %d", node.URL, depth))
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Printf("Unable to encode the link node. Error: %+v\n", err)
+			logErr(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}).Methods(http.MethodGet)
 
-	log.Println("Listening on port 8081")
+	logInfo("Listening on port 8081")
 	err = http.ListenAndServe(":8081", router)
 	if err != nil {
-		log.Println(err)
+		logErr(err)
 		return
 	}
 }
