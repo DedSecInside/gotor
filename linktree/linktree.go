@@ -66,8 +66,8 @@ func isValidURL(URL string) bool {
 	return false
 }
 
-// streams the child nodes of a link
-func (m *NodeManager) streamUrls(link string) chan string {
+// StreamUrls the child nodes of a link using a custom validator
+func (m *NodeManager) StreamUrls(link string, validator func(link string) bool) chan string {
 	linkChan := make(chan string, 100)
 	go func() {
 		defer close(linkChan)
@@ -91,7 +91,7 @@ func (m *NodeManager) streamUrls(link string) chan string {
 				if token.Data == "a" {
 					for _, attr := range token.Attr {
 						if attr.Key == "href" {
-							if isValidURL(attr.Val) {
+							if validator(attr.Val) {
 								linkChan <- attr.Val
 							}
 						}
@@ -106,7 +106,7 @@ func (m *NodeManager) streamUrls(link string) chan string {
 // LoadNode ...
 func (m *NodeManager) LoadNode(root string, depth int) *Node {
 	node := NewNode(m, root)
-	rootChan := m.streamUrls(root)
+	rootChan := m.StreamUrls(root, isValidURL)
 	m.buildTree(rootChan, depth, node)
 	m.wg.Wait()
 	return node
@@ -120,7 +120,7 @@ func (m *NodeManager) crawl(linkChan <-chan string, depth int, doWork func(link 
 			doWork(l)
 			if depth > 1 {
 				depth--
-				subLinkChan := m.streamUrls(l)
+				subLinkChan := m.StreamUrls(l, isValidURL)
 				m.crawl(subLinkChan, depth, doWork)
 			}
 		}(link)
@@ -139,7 +139,7 @@ func (m *NodeManager) buildTree(linkChan <-chan string, depth int, node *Node) {
 				node.Children = append(node.Children, n)
 				if depth > 1 {
 					depth--
-					subLinkChan := m.streamUrls(l)
+					subLinkChan := m.StreamUrls(l, isValidURL)
 					m.buildTree(subLinkChan, depth, n)
 				}
 			}
@@ -158,7 +158,7 @@ func NewNodeManager(client *http.Client) *NodeManager {
 
 // Crawl ...
 func (m *NodeManager) Crawl(root string, depth int, work func(link string)) {
-	rootChan := m.streamUrls(root)
+	rootChan := m.StreamUrls(root, isValidURL)
 	m.crawl(rootChan, depth, work)
 	m.wg.Wait()
 }
