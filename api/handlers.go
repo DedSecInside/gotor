@@ -73,8 +73,10 @@ func getEmails(client *http.Client, link string) []string {
 		return false
 	})
 	links := []string{}
-	for emailLink := range linkChan {
-		links = append(links, emailLink)
+	for childLink := range linkChan {
+		linkPieces := strings.Split(childLink, "mailto:")
+		links = append(links, linkPieces[1])
+
 	}
 	return links
 }
