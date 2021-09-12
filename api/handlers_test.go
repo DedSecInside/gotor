@@ -33,7 +33,7 @@ func TestGetEmails(t *testing.T) {
 	myMockPage := `<!DOCTYPE html>
 		<html lang=en-US class=no-js>
 			<head><title>Tor Project</title></head>
-			<body><a href="mailto:random@gmail.com"/></body>
+			<body><a href="mailto:random@gmail.com">Email me</a></body>
 		</html>`
 
 	link := "https://random.com"
