@@ -1,5 +1,10 @@
 # gotor
 
+### Status/Social Links
+[![CircleCI](https://circleci.com/gh/KingAkeem/gotor.svg?style=svg)](https://circleci.com/gh/KingAkeem/gotor)
+[![Open Source Helpers](https://www.codetriage.com/kingakeem/gotor/badges/users.svg)](https://www.codetriage.com/kingakeem/gotor)
+
+
 This is a HTTP REST API and command line program for webcrawling Tor (and non Tor) sites.
 
 ### Flags
