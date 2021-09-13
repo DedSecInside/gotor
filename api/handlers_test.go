@@ -48,7 +48,7 @@ func TestGetTorIP(t *testing.T) {
 		t.Error(err)
 	}
 	httpmock.DeactivateAndReset()
-	assert.NotEqual(t, ip, "Random IP Address", "The IP address was not successfully extracted.")
+	assert.Equal(t, ip, "Random IP Address", "The IP address was not successfully extracted.")
 
 	httpmock.Activate()
 	page = newPage("Tor Project", "")
