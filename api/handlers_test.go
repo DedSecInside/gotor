@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"net/http"
@@ -16,6 +17,15 @@ func assertNode(t *testing.T, n *linktree.Node, link string, numChildren int) {
 	assert.Equal(t, n.Status, "OK", "The status should be OK.")
 	assert.Equal(t, n.StatusCode, 200, "The status code should be 200.")
 	assert.Equal(t, n.URL, link, fmt.Sprintf("Node URL should be %s", link))
+}
+
+func assertEmails(t *testing.T, emails []string, expectedEmails []string) {
+	assert.Len(t, emails, len(expectedEmails), "The expected email slice contains invalid emails.")
+	for _, expectedEmail := range expectedEmails {
+		provider := strings.Split(expectedEmail, "@")[1]
+		errMsg := fmt.Sprintf("%s address not parsed.", provider)
+		assert.Contains(t, emails, expectedEmail, errMsg)
+	}
 }
 
 func newPage(title, body string) string {
@@ -77,11 +87,7 @@ func TestGetEmails(t *testing.T) {
 	emails = getEmails(http.DefaultClient, link)
 	httpmock.DeactivateAndReset()
 
-	assert.Contains(t, emails, "random@gmail.com", "Gmail address not parsed")
-	assert.Contains(t, emails, "random@yahoo.com", "Yahoo address not parsed")
-	assert.Contains(t, emails, "random@protonmail.com", "Protonmail address not parsed")
-	assert.Contains(t, emails, "random@outlook.com", "Outlook address not parsed")
-	assert.Len(t, emails, 4, "The email address was not successfully extracted.")
+	assertEmails(t, emails, []string{"random@gmail.com", "random@protonmail.com", "random@outlook.com", "random@yahoo.com"})
 }
 
 func TestGetTree(t *testing.T) {
