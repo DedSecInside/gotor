@@ -18,11 +18,6 @@ jobs:
           paths:
             - "/go/pkg/mod"
       - run:
-          name: Lint
-          command: |
-                  ./bin/golangcli-lint run
-
-      - run:
           name: Run tests
           command: |
                   go test ./... -v -cover
