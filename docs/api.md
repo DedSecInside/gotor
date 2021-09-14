@@ -11,14 +11,14 @@
 e.g. depth of 1
 ```json
 {
-        url: 'https://www.example.com',
-        status: 'OK',
-        status_code: 200,
-        children: [{
-                url: 'https://www.child.com',
-                status: 'OK',
-                status_code: 200,
-                children: []
+        "url": "https://www.example.com",
+        "status": "OK",
+        "status_code": 200,
+        "children": [{
+                "url": "https://www.child.com",
+                "status": "OK",
+                "status_code": 200,
+                "children": []
         }]
 }
 ```
@@ -31,7 +31,7 @@ e.g. depth of 1
 - link (string): the root URL of the tree
 
 ```json
-['random@gmail.com', 'random@yahoo.com']
+["random@gmail.com", "random@yahoo.com"]
 ```
 
 ## Get IP
