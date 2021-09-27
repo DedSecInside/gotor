@@ -63,12 +63,12 @@ func NewNode(client *http.Client, URL string) *Node {
 	return n
 }
 
-// StreamUrls the child nodes of a link using a custom validator
-func streamTokens(client *http.Client, page string) chan html.Token {
+// streams start tag tokens found within HTML content at the given link
+func streamTokens(client *http.Client, link string) chan html.Token {
 	tokenStream := make(chan html.Token, 100)
 	go func() {
 		defer close(tokenStream)
-		resp, err := client.Get(page)
+		resp, err := client.Get(link)
 		if err != nil {
 			log.Println(err)
 			return
@@ -92,6 +92,7 @@ func streamTokens(client *http.Client, page string) chan html.Token {
 	return tokenStream
 }
 
+// filters tokens from the stream that do not pass the given tokenfilter
 func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string {
 	filterStream := make(chan string)
 
@@ -126,36 +127,44 @@ func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string 
 	return filterStream
 }
 
+// TokenFilter determines which tokens will be filtered from a stream,
+// 1. There are zero to many attributes per tag.
+// if the tag is included then those tags will be used (e.g. all anchor tags)
+// if the attribute is included then those attributes will be used (e.g. all href attributes)
+// if both are specified then the combination will be used (e.g. all href attributes within anchor tags only)
+// if neither is specified then all tokens will be used (e.g. all tags found)
 type TokenFilter struct {
 	tags       map[string]bool
 	attributes map[string]bool
 }
 
-// builds a tree from the given link channel
+// builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
 func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup) {
 	for link := range childLinks {
-		go func(parent *Node, link string, depth int) {
-			defer wg.Done()
-			// Do not add the link as it's own child
-			if parent.URL != link {
-				n := NewNode(parent.Client, link)
-				parent.Children = append(parent.Children, n)
-				if depth > 1 {
-					depth--
-					tokenStream := streamTokens(n.Client, n.URL)
-					filteredStream := filterTokens(tokenStream, &TokenFilter{
-						tags:       map[string]bool{"a": true},
-						attributes: map[string]bool{"href": true},
-					})
-					buildTree(n, depth, filteredStream, wg)
+		if isValidURL(link) {
+			wg.Add(1)
+			go func(parent *Node, link string, depth int) {
+				defer wg.Done()
+				// Do not add the link as it's own child
+				if parent.URL != link {
+					n := NewNode(parent.Client, link)
+					parent.Children = append(parent.Children, n)
+					if depth > 1 {
+						depth--
+						tokenStream := streamTokens(n.Client, n.URL)
+						filteredStream := filterTokens(tokenStream, &TokenFilter{
+							tags:       map[string]bool{"a": true},
+							attributes: map[string]bool{"href": true},
+						})
+						buildTree(n, depth, filteredStream, wg)
+					}
 				}
-			}
-		}(parent, link, depth)
-		wg.Add(1)
+			}(parent, link, depth)
+		}
 	}
 }
 
-// BuildTree...
+// Load places the tree within memory.
 func (n *Node) Load(depth int) {
 	tokenStream := streamTokens(n.Client, n.URL)
 	filteredStream := filterTokens(tokenStream, &TokenFilter{
@@ -170,7 +179,7 @@ func (n *Node) Load(depth int) {
 	n.LastLoaded = time.Now().UTC()
 }
 
-// streams the status of the links from the channel until the depth has reached 0
+// perform work on each token stream until the deapth has been reached
 func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, depth int, doWork func(link string)) {
 	for link := range linkChan {
 		go func(currentLink string, currentDepth int) {
@@ -190,7 +199,7 @@ func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, dept
 	}
 }
 
-// Crawl ...
+// Crawl traverses the children of a node without storing it in memory
 func (n *Node) Crawl(depth int, work func(link string)) {
 	tokenStream := streamTokens(n.Client, n.URL)
 	filteredStream := filterTokens(tokenStream, &TokenFilter{
