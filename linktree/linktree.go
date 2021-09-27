@@ -7,17 +7,20 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"golang.org/x/net/html"
 )
 
 // Node represents a single URL
 type Node struct {
-	client     *http.Client
 	URL        string  `json:"url"`
 	StatusCode int     `json:"status_code"`
 	Status     string  `json:"status"`
 	Children   []*Node `json:"children"`
+	Client     *http.Client
+	Loaded     bool
+	LastLoaded time.Time
 }
 
 // PrintTree ...
@@ -33,7 +36,7 @@ func (n *Node) PrintTree() {
 
 // UpdateStatus updates the status of the URL
 func (n *Node) updateStatus() {
-	resp, err := n.client.Get(n.URL)
+	resp, err := n.Client.Get(n.URL)
 	if err != nil {
 		n.Status = "UNKNOWN"
 		n.StatusCode = http.StatusInternalServerError
@@ -41,12 +44,6 @@ func (n *Node) updateStatus() {
 	}
 	n.Status = http.StatusText(resp.StatusCode)
 	n.StatusCode = resp.StatusCode
-}
-
-// NodeManager ...
-type NodeManager struct {
-	client *http.Client
-	wg     *sync.WaitGroup
 }
 
 func isValidURL(URL string) bool {
@@ -60,7 +57,7 @@ func isValidURL(URL string) bool {
 func NewNode(client *http.Client, URL string) *Node {
 	n := &Node{
 		URL:    URL,
-		client: client,
+		Client: client,
 	}
 	n.updateStatus()
 	return n
@@ -141,11 +138,11 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 			defer wg.Done()
 			// Do not add the link as it's own child
 			if parent.URL != link {
-				n := NewNode(parent.client, link)
+				n := NewNode(parent.Client, link)
 				parent.Children = append(parent.Children, n)
 				if depth > 1 {
 					depth--
-					tokenStream := streamTokens(n.client, n.URL)
+					tokenStream := streamTokens(n.Client, n.URL)
 					filteredStream := filterTokens(tokenStream, &TokenFilter{
 						tags:       map[string]bool{"a": true},
 						attributes: map[string]bool{"href": true},
@@ -159,18 +156,18 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 }
 
 // BuildTree...
-func BuildTree(client *http.Client, root string, depth int) *Node {
-	node := NewNode(client, root)
-	tokenStream := streamTokens(client, root)
+func (n *Node) Load(depth int) {
+	tokenStream := streamTokens(n.Client, n.URL)
 	filteredStream := filterTokens(tokenStream, &TokenFilter{
 		tags:       map[string]bool{"a": true},
 		attributes: map[string]bool{"href": true},
 	})
 
 	wg := new(sync.WaitGroup)
-	buildTree(node, depth, filteredStream, wg)
+	buildTree(n, depth, filteredStream, wg)
 	wg.Wait()
-	return node
+	n.Loaded = true
+	n.LastLoaded = time.Now().UTC()
 }
 
 // streams the status of the links from the channel until the depth has reached 0
@@ -194,13 +191,13 @@ func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, dept
 }
 
 // Crawl ...
-func Crawl(client *http.Client, root string, depth int, work func(link string)) {
-	tokenStream := streamTokens(client, root)
+func (n *Node) Crawl(depth int, work func(link string)) {
+	tokenStream := streamTokens(n.Client, n.URL)
 	filteredStream := filterTokens(tokenStream, &TokenFilter{
 		tags:       map[string]bool{"a": true},
 		attributes: map[string]bool{"href": true},
 	})
 	wg := new(sync.WaitGroup)
-	crawl(client, wg, filteredStream, depth, work)
+	crawl(n.Client, wg, filteredStream, depth, work)
 	wg.Wait()
 }

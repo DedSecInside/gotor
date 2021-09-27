@@ -38,9 +38,14 @@ func newTorClient(host, port string) (*http.Client, error) {
 	}, nil
 }
 
-func writeTerminal(client *http.Client, root string, depth int) {
+func writeTree(node *linktree.Node, depth int) {
+	node.Load(depth)
+	node.PrintTree()
+}
+
+func writeTerminal(node *linktree.Node, depth int) {
 	printStatus := func(link string) {
-		n := linktree.NewNode(client, link)
+		n := linktree.NewNode(node.Client, link)
 		markError := ansi.ColorFunc("red")
 		markSuccess := ansi.ColorFunc("green")
 		if n.StatusCode != 200 {
@@ -49,10 +54,10 @@ func writeTerminal(client *http.Client, root string, depth int) {
 			fmt.Printf("Link: %20s Status: %d %s\n", n.URL, n.StatusCode, markSuccess(n.Status))
 		}
 	}
-	linktree.Crawl(client, root, depth, printStatus)
+	node.Crawl(depth, printStatus)
 }
 
-func writeExcel(client *http.Client, root string, depth int) {
+func writeExcel(node *linktree.Node, depth int) {
 	f := excelize.NewFile()
 	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
 	if err != nil {
@@ -66,7 +71,7 @@ func writeExcel(client *http.Client, root string, depth int) {
 	}
 	row := 2
 	addRow := func(link string) {
-		node := linktree.NewNode(client, link)
+		node := linktree.NewNode(node.Client, link)
 		linkCell := fmt.Sprintf("A%d", row)
 		statusCell := fmt.Sprintf("B%d", row)
 		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
@@ -81,8 +86,8 @@ func writeExcel(client *http.Client, root string, depth int) {
 		}
 		row++
 	}
-	linktree.Crawl(client, root, depth, addRow)
-	u, err := url.Parse(root)
+	node.Crawl(depth, addRow)
+	u, err := url.Parse(node.URL)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -154,13 +159,13 @@ func main() {
 		return
 	}
 
+	node := linktree.NewNode(client, root)
 	switch output {
 	case "terminal":
-		writeTerminal(client, root, depth)
+		writeTerminal(node, depth)
 	case "excel":
-		writeExcel(client, root, depth)
+		writeExcel(node, depth)
 	case "tree":
-		node := linktree.BuildTree(client, root, depth)
-		node.PrintTree()
+		writeTree(node, depth)
 	}
 }
