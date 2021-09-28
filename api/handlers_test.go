@@ -101,8 +101,8 @@ func TestGetTree(t *testing.T) {
 	httpmock.RegisterResponder("GET", rootLink,
 		httpmock.NewStringResponder(200, page))
 
-	manager := linktree.NewNodeManager(http.DefaultClient)
-	node := manager.LoadNode(rootLink, 1)
+	node := linktree.NewNode(http.DefaultClient, rootLink)
+	node.Load(1)
 	httpmock.DeactivateAndReset()
 
 	assertNode(t, node, rootLink, 1)
@@ -121,8 +121,8 @@ func TestGetTree(t *testing.T) {
 	httpmock.RegisterResponder("GET", rootLink,
 		httpmock.NewStringResponder(200, page))
 
-	manager = linktree.NewNodeManager(http.DefaultClient)
-	node = manager.LoadNode(rootLink, 2)
+	node = linktree.NewNode(http.DefaultClient, rootLink)
+	node.Load(2)
 	httpmock.DeactivateAndReset()
 
 	assertNode(t, node, rootLink, 1)

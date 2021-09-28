@@ -31,8 +31,8 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 
 		link := queryMap.Get("link")
 		log.Printf("processing link %s at a depth of %d\n", link, depth)
-		manager := linktree.NewNodeManager(client)
-		node := manager.LoadNode(link, depth)
+		node := linktree.NewNode(client, link)
+		node.Load(depth)
 		log.Printf("Tree built for %s at depth %d\n", node.URL, depth)
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
@@ -64,20 +64,16 @@ func isEmailValid(e string) bool {
 
 // gets any email addresses on the url passed
 func getEmails(client *http.Client, link string) []string {
-	manager := linktree.NewNodeManager(client)
-	linkChan := manager.StreamUrls(link, func(childLink string) bool {
-		linkPieces := strings.Split(childLink, "mailto:")
-		if len(linkPieces) > 1 {
-			return isEmailValid(linkPieces[1])
-		}
-		return false
-	})
 	links := []string{}
-	for childLink := range linkChan {
+	node := linktree.NewNode(client, link)
+	depth := 1
+	collectLinks := func(childLink string) {
 		linkPieces := strings.Split(childLink, "mailto:")
-		links = append(links, linkPieces[1])
-
+		if len(linkPieces) > 1 && isEmailValid(linkPieces[1]) {
+			links = append(links, linkPieces[1])
+		}
 	}
+	node.Crawl(depth, collectLinks)
 	return links
 }
 

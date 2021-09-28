@@ -7,17 +7,20 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"golang.org/x/net/html"
 )
 
 // Node represents a single URL
 type Node struct {
-	manager    *NodeManager
 	URL        string  `json:"url"`
 	StatusCode int     `json:"status_code"`
 	Status     string  `json:"status"`
 	Children   []*Node `json:"children"`
+	Client     *http.Client
+	Loaded     bool
+	LastLoaded time.Time
 }
 
 // PrintTree ...
@@ -33,7 +36,7 @@ func (n *Node) PrintTree() {
 
 // UpdateStatus updates the status of the URL
 func (n *Node) updateStatus() {
-	resp, err := n.manager.client.Get(n.URL)
+	resp, err := n.Client.Get(n.URL)
 	if err != nil {
 		n.Status = "UNKNOWN"
 		n.StatusCode = http.StatusInternalServerError
@@ -43,22 +46,6 @@ func (n *Node) updateStatus() {
 	n.StatusCode = resp.StatusCode
 }
 
-// NewNode returns a new Link object
-func NewNode(manager *NodeManager, URL string) *Node {
-	n := &Node{
-		URL:     URL,
-		manager: manager,
-	}
-	n.updateStatus()
-	return n
-}
-
-// NodeManager ...
-type NodeManager struct {
-	client *http.Client
-	wg     *sync.WaitGroup
-}
-
 func isValidURL(URL string) bool {
 	if u, err := url.ParseRequestURI(URL); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
 		return true
@@ -66,12 +53,22 @@ func isValidURL(URL string) bool {
 	return false
 }
 
-// StreamUrls the child nodes of a link using a custom validator
-func (m *NodeManager) StreamUrls(link string, validator func(link string) bool) chan string {
-	linkChan := make(chan string, 100)
+// NewNode returns a new Link object
+func NewNode(client *http.Client, URL string) *Node {
+	n := &Node{
+		URL:    URL,
+		Client: client,
+	}
+	n.updateStatus()
+	return n
+}
+
+// streams start tag tokens found within HTML content at the given link
+func streamTokens(client *http.Client, link string) chan html.Token {
+	tokenStream := make(chan html.Token, 100)
 	go func() {
-		defer close(linkChan)
-		resp, err := m.client.Get(link)
+		defer close(tokenStream)
+		resp, err := client.Get(link)
 		if err != nil {
 			log.Println(err)
 			return
@@ -88,77 +85,123 @@ func (m *NodeManager) StreamUrls(link string, validator func(link string) bool) 
 				return
 			case html.StartTagToken:
 				token := tokenizer.Token()
-				if token.Data == "a" {
-					for _, attr := range token.Attr {
-						if attr.Key == "href" {
-							if validator(attr.Val) {
-								linkChan <- attr.Val
-							}
-						}
-					}
+				tokenStream <- token
+			}
+		}
+	}()
+	return tokenStream
+}
+
+// filters tokens from the stream that do not pass the given tokenfilter
+func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string {
+	filterStream := make(chan string)
+
+	filterAttributes := func(token html.Token) {
+		// check if token passes filter
+		for _, attr := range token.Attr {
+			if _, foundAttribute := filter.attributes[attr.Key]; foundAttribute {
+				filterStream <- attr.Val
+			}
+		}
+	}
+
+	go func() {
+		defer close(filterStream)
+		for token := range tokenStream {
+			if len(filter.tags) == 0 {
+				filterStream <- token.Data
+			}
+
+			// check if token passes tag filter or tag filter is empty
+			if _, foundTag := filter.tags[token.Data]; foundTag {
+				// emit attributes if there is a filter, otherwise emit token
+				if len(filter.attributes) > 0 {
+					filterAttributes(token)
+				} else {
+					filterStream <- token.Data
 				}
 			}
 		}
 	}()
-	return linkChan
+
+	return filterStream
 }
 
-// LoadNode ...
-func (m *NodeManager) LoadNode(root string, depth int) *Node {
-	node := NewNode(m, root)
-	rootChan := m.StreamUrls(root, isValidURL)
-	m.buildTree(rootChan, depth, node)
-	m.wg.Wait()
-	return node
+// TokenFilter determines which tokens will be filtered from a stream,
+// 1. There are zero to many attributes per tag.
+// if the tag is included then those tags will be used (e.g. all anchor tags)
+// if the attribute is included then those attributes will be used (e.g. all href attributes)
+// if both are specified then the combination will be used (e.g. all href attributes within anchor tags only)
+// if neither is specified then all tokens will be used (e.g. all tags found)
+type TokenFilter struct {
+	tags       map[string]bool
+	attributes map[string]bool
 }
 
-// streams the status of the links from the channel until the depth has reached 0
-func (m *NodeManager) crawl(linkChan <-chan string, depth int, doWork func(link string)) {
-	for link := range linkChan {
-		go func(l string) {
-			defer m.wg.Done()
-			doWork(l)
-			if depth > 1 {
-				depth--
-				subLinkChan := m.StreamUrls(l, isValidURL)
-				m.crawl(subLinkChan, depth, doWork)
-			}
-		}(link)
-		m.wg.Add(1)
-	}
-}
-
-// builds a tree from the given link channel
-func (m *NodeManager) buildTree(linkChan <-chan string, depth int, node *Node) {
-	for link := range linkChan {
-		go func(l string, node *Node) {
-			defer m.wg.Done()
-			// Do not add the link as it's own child
-			if node.URL != l {
-				n := NewNode(m, l)
-				node.Children = append(node.Children, n)
-				if depth > 1 {
-					depth--
-					subLinkChan := m.StreamUrls(l, isValidURL)
-					m.buildTree(subLinkChan, depth, n)
+// builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
+func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup, filter *TokenFilter) {
+	for link := range childLinks {
+		if isValidURL(link) {
+			wg.Add(1)
+			go func(parent *Node, link string, depth int) {
+				defer wg.Done()
+				// Do not add the link as it's own child
+				if parent.URL != link {
+					n := NewNode(parent.Client, link)
+					parent.Children = append(parent.Children, n)
+					if depth > 1 {
+						depth--
+						tokenStream := streamTokens(n.Client, n.URL)
+						filteredStream := filterTokens(tokenStream, filter)
+						buildTree(n, depth, filteredStream, wg, filter)
+					}
 				}
+			}(parent, link, depth)
+		}
+	}
+}
+
+// Load places the tree within memory.
+func (n *Node) Load(depth int) {
+	tokenStream := streamTokens(n.Client, n.URL)
+	filter := &TokenFilter{
+		tags:       map[string]bool{"a": true},
+		attributes: map[string]bool{"href": true},
+	}
+	filteredStream := filterTokens(tokenStream, filter)
+	wg := new(sync.WaitGroup)
+	buildTree(n, depth, filteredStream, wg, filter)
+	wg.Wait()
+	n.Loaded = true
+	n.LastLoaded = time.Now().UTC()
+}
+
+// perform work on each token stream until the deapth has been reached
+func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, depth int, filter *TokenFilter, doWork func(link string)) {
+	for link := range linkChan {
+		go func(currentLink string, currentDepth int) {
+			defer wg.Done()
+			doWork(currentLink)
+			if currentDepth > 1 {
+				currentDepth--
+				tokenStream := streamTokens(client, currentLink)
+				filteredStream := filterTokens(tokenStream, filter)
+				crawl(client, wg, filteredStream, currentDepth, filter, doWork)
 			}
-		}(link, node)
-		m.wg.Add(1)
+		}(link, depth)
+		wg.Add(1)
 	}
 }
 
-// NewNodeManager ...
-func NewNodeManager(client *http.Client) *NodeManager {
-	return &NodeManager{
-		client: client,
-		wg:     new(sync.WaitGroup),
+// Crawl traverses the children of a node without storing it in memory
+func (n *Node) Crawl(depth int, work func(link string)) {
+	tokenStream := streamTokens(n.Client, n.URL)
+	filter := &TokenFilter{
+		tags:       map[string]bool{"a": true},
+		attributes: map[string]bool{"href": true},
 	}
-}
-
-// Crawl ...
-func (m *NodeManager) Crawl(root string, depth int, work func(link string)) {
-	rootChan := m.StreamUrls(root, isValidURL)
-	m.crawl(rootChan, depth, work)
-	m.wg.Wait()
+	filteredStream := filterTokens(tokenStream, filter)
+	wg := new(sync.WaitGroup)
+	crawl(n.Client, wg, filteredStream, depth, filter, work)
+	wg.Wait()
 }
