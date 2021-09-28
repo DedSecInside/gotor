@@ -139,7 +139,7 @@ type TokenFilter struct {
 }
 
 // builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
-func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup) {
+func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup, filter *TokenFilter) {
 	for link := range childLinks {
 		if isValidURL(link) {
 			wg.Add(1)
@@ -152,11 +152,8 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 					if depth > 1 {
 						depth--
 						tokenStream := streamTokens(n.Client, n.URL)
-						filteredStream := filterTokens(tokenStream, &TokenFilter{
-							tags:       map[string]bool{"a": true},
-							attributes: map[string]bool{"href": true},
-						})
-						buildTree(n, depth, filteredStream, wg)
+						filteredStream := filterTokens(tokenStream, filter)
+						buildTree(n, depth, filteredStream, wg, filter)
 					}
 				}
 			}(parent, link, depth)
@@ -167,20 +164,20 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 // Load places the tree within memory.
 func (n *Node) Load(depth int) {
 	tokenStream := streamTokens(n.Client, n.URL)
-	filteredStream := filterTokens(tokenStream, &TokenFilter{
+	filter := &TokenFilter{
 		tags:       map[string]bool{"a": true},
 		attributes: map[string]bool{"href": true},
-	})
-
+	}
+	filteredStream := filterTokens(tokenStream, filter)
 	wg := new(sync.WaitGroup)
-	buildTree(n, depth, filteredStream, wg)
+	buildTree(n, depth, filteredStream, wg, filter)
 	wg.Wait()
 	n.Loaded = true
 	n.LastLoaded = time.Now().UTC()
 }
 
 // perform work on each token stream until the deapth has been reached
-func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, depth int, doWork func(link string)) {
+func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, depth int, filter *TokenFilter, doWork func(link string)) {
 	for link := range linkChan {
 		go func(currentLink string, currentDepth int) {
 			defer wg.Done()
@@ -188,11 +185,8 @@ func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, dept
 			if currentDepth > 1 {
 				currentDepth--
 				tokenStream := streamTokens(client, currentLink)
-				filteredStream := filterTokens(tokenStream, &TokenFilter{
-					tags:       map[string]bool{"a": true},
-					attributes: map[string]bool{"href": true},
-				})
-				crawl(client, wg, filteredStream, currentDepth, doWork)
+				filteredStream := filterTokens(tokenStream, filter)
+				crawl(client, wg, filteredStream, currentDepth, filter, doWork)
 			}
 		}(link, depth)
 		wg.Add(1)
@@ -202,11 +196,12 @@ func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, dept
 // Crawl traverses the children of a node without storing it in memory
 func (n *Node) Crawl(depth int, work func(link string)) {
 	tokenStream := streamTokens(n.Client, n.URL)
-	filteredStream := filterTokens(tokenStream, &TokenFilter{
+	filter := &TokenFilter{
 		tags:       map[string]bool{"a": true},
 		attributes: map[string]bool{"href": true},
-	})
+	}
+	filteredStream := filterTokens(tokenStream, filter)
 	wg := new(sync.WaitGroup)
-	crawl(n.Client, wg, filteredStream, depth, work)
+	crawl(n.Client, wg, filteredStream, depth, filter, work)
 	wg.Wait()
 }
