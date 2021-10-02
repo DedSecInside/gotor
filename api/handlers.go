@@ -93,15 +93,19 @@ func GetEmails(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 }
 
 // gets any phone number addresses on the url passed
-func getPhone(client *http.Client, link string) string {
+func getPhone(client *http.Client, link string) []string {
+	phone := []string{}
 	node := linktree.NewNode(client, link)
 	depth := 1
 	collectLinks := func(childLink string) {
 		linkPieces := strings.Split(childLink, "tel:")
 		if len(linkPieces) > 1 {
-			node.Phone = linkPieces[1]
+			phone = append(phone, linkPieces[1])
 		}
 	}
+	node.Crawl(depth, collectLinks)
+	return phone
+}
 
 // GetPhone number ...
 func GetPhone(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +120,7 @@ func GetPhone(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+}
 
 // gets the current IP adress of the Tor client
 func getTorIP(client *http.Client) (string, error) {
