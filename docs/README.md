@@ -34,6 +34,17 @@ e.g. depth of 1
 ["random@gmail.com", "random@yahoo.com"]
 ```
 
+## Get Phone Numbers
+        
+### GET `http://localhost:{port}/phone_numbers` 
+                
+### Arguments
+- link (string): the root URL of the tree
+
+```json
+["+1-234-567-8901", "+1-234-567-8902"]
+```
+
 ## Get IP
 
 ### GET `http://localhost:{port}/ip`
