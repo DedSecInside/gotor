@@ -1,7 +1,7 @@
 # gotor
 
 ### Status/Social Links
-[![CircleCI](https://circleci.com/gh/KingAkeem/gotor.svg?style=svg)](https://circleci.com/gh/KingAkeem/gotor)
+[![CircleCI](https://circleci.com/gh/DedSecInside/gotor.svg?style=svg)](https://circleci.com/gh/DedSecInside/gotor)
 [![Open Source Helpers](https://www.codetriage.com/kingakeem/gotor/badges/users.svg)](https://www.codetriage.com/kingakeem/gotor)
 [![](https://img.shields.io/badge/Made%20with-Go-blue.svg?style=flat-square)]()
 
