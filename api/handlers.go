@@ -93,7 +93,7 @@ func GetEmails(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 }
 
 // gets any phone number addresses on the url passed
-func getPhone(client *http.Client, link string) []string {
+func getPhoneNumbers(client *http.Client, link string) []string {
 	phone := []string{}
 	node := linktree.NewNode(client, link)
 	depth := 1
@@ -108,11 +108,11 @@ func getPhone(client *http.Client, link string) []string {
 }
 
 // GetPhone number ...
-func GetPhone(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
+func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
 		link := queryMap.Get("link")
-		phone := getPhone(c, link)
+		phone := getPhoneNumbers(c, link)
 		err := json.NewEncoder(w).Encode(phone)
 		if err != nil {
 			log.Println("Error:", err)

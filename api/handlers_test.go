@@ -90,6 +90,34 @@ func TestGetEmails(t *testing.T) {
 	assertEmails(t, emails, []string{"random@gmail.com", "random@protonmail.com", "random@outlook.com", "random@yahoo.com"})
 }
 
+func TestPhoneNumbers(t *testing.T) {
+	link := "https://www.random.com"
+	httpmock.Activate()
+	page := newPage("Random Site", `<a href="tel:+1-555-555-5555">Call me</a>`)
+	httpmock.RegisterResponder("GET", link,
+		httpmock.NewStringResponder(200, page))
+	phone := getPhoneNumbers(http.DefaultClient, link)
+	httpmock.DeactivateAndReset()
+	assert.Contains(t, phone, "+1-555-555-5555", "The phone number should be in the slice.")
+	assert.Len(t, phone, 1, "There should be only one phone number.")
+
+	httpmock.Activate()
+	page = newPage("Random Site", `<a href="tel:+1-555-555-5555">call me</a>
+					<a href="tel:+1-555-555-5556">call me</a>
+					<a href="tel:+1-555-555-5557">call me</a>
+					<a href="tel:+1-555-555-5558">call me</a>`)
+	httpmock.RegisterResponder("GET", link,
+		httpmock.NewStringResponder(200, page))
+	phone = getPhoneNumbers(http.DefaultClient, link)
+	httpmock.DeactivateAndReset()
+	assert.Contains(t, phone, "+1-555-555-5555", "The phone number should be in the slice.")
+	assert.Contains(t, phone, "+1-555-555-5556", "The phone number should be in the slice.")
+	assert.Contains(t, phone, "+1-555-555-5557", "The phone number should be in the slice.")
+	assert.Contains(t, phone, "+1-555-555-5558", "The phone number should be in the slice.")
+	assert.Len(t, phone, 4, "There should be 4 phone numbers.")
+}
+
+
 func TestGetTree(t *testing.T) {
 	// Test getting a tree of depth 1
 	rootLink := "https://www.root.com"
