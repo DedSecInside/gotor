@@ -14,13 +14,13 @@ import (
 
 // Node represents a single URL
 type Node struct {
-	URL        string  `json:"url"`
-	StatusCode int     `json:"status_code"`
-	Status     string  `json:"status"`
-	Children   []*Node `json:"children"`
-	Client     *http.Client
-	Loaded     bool
-	LastLoaded time.Time
+	URL        string       `json:"url"`
+	StatusCode int          `json:"status_code"`
+	Status     string       `json:"status"`
+	Children   []*Node      `json:"children"`
+	Client     *http.Client `json:"-"`
+	Loaded     bool         `json:"-"`
+	LastLoaded time.Time    `json:"-"`
 }
 
 // PrintTree ...
