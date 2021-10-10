@@ -100,7 +100,9 @@ func getPhoneNumbers(client *http.Client, link string) []string {
 	collectLinks := func(childLink string) {
 		linkPieces := strings.Split(childLink, "tel:")
 		if len(linkPieces) > 1 {
-			phone = append(phone, linkPieces[1])
+			if len(linkPieces[1]) > 0 {
+				phone = append(phone, linkPieces[1])
+			}
 		}
 	}
 	node.Crawl(depth, collectLinks)
