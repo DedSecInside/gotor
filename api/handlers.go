@@ -23,7 +23,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		if err != nil {
 			_, err := w.Write([]byte("Invalid depth. Must be an integer."))
 			if err != nil {
-				log.Printf("Error: %+v", err)
+				log.Printf("Error: %+v\n", err)
 			}
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -36,7 +36,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		log.Printf("Tree built for %s at depth %d\n", node.URL, depth)
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Printf("Error: %+v", err)
+			log.Printf("Error: %+v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
