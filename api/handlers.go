@@ -2,22 +2,34 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/KingAkeem/gotor/linktree"
+	"github.com/patrickmn/go-cache"
 	"golang.org/x/net/html"
 )
 
-// GetTreeNode writes a tree using the root and depth given
+// GetTreeNode writes a tree using the root and depth given, has a cache to avoid excessive lookups because building a tree is an expensive operation
 func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
+	lookup := cache.New(1*time.Minute, 10*time.Minute)
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
+		link := queryMap.Get("link")
+		parsedLink, err := url.Parse(link)
+		if err != nil {
+			log.Printf("Error: %+v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
 		depthInput := queryMap.Get("depth")
 		depth, err := strconv.Atoi(depthInput)
 		if err != nil {
@@ -29,7 +41,16 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		link := queryMap.Get("link")
+		key := fmt.Sprintf("%s-%d", parsedLink.Host, depth)
+		if recentNode, found := lookup.Get(key); found {
+			err := json.NewEncoder(w).Encode(recentNode)
+			if err != nil {
+				log.Printf("Error: %+v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			return
+		}
+
 		log.Printf("processing link %s at a depth of %d\n", link, depth)
 		node := linktree.NewNode(client, link)
 		node.Load(depth)
@@ -40,6 +61,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		lookup.Set(key, node, cache.DefaultExpiration)
 	}
 }
 
