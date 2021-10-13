@@ -36,7 +36,7 @@ func getNode(client *http.Client, lookup *cache.Cache, link string, depth int) (
 	return node, nil
 }
 
-func writeNode(w http.ResponseWriter, lookup *cache.Cache, node *linktree.Node, depth string) {
+func writeNode(w http.ResponseWriter, node *linktree.Node) {
 	err := json.NewEncoder(w).Encode(node)
 	if err != nil {
 		log.Printf("Error: %+v\n", err)
@@ -67,7 +67,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		writeNode(w, lookup, node, strconv.Itoa(depth))
+		writeNode(w, node)
 	}
 }
 
