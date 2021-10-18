@@ -18,36 +18,37 @@ import (
 	"golang.org/x/net/html"
 )
 
-func getNode(client *http.Client, lookup *cache.Cache, link string, depth int) (*linktree.Node, error) {
-	parsedLink, err := url.Parse(link)
-	if err != nil {
-		return nil, err
-	}
-	key := fmt.Sprintf("%s-%d", parsedLink.Host, depth)
-	if recentNode, found := lookup.Get(key); found {
-		return recentNode.(*linktree.Node), nil
-	}
-
-	log.Printf("processing link %s at a depth of %d\n", link, depth)
-	node := linktree.NewNode(client, link)
-	node.Load(depth)
-	log.Printf("Tree built for %s at depth %d\n", node.URL, depth)
-	lookup.Set(key, node, cache.DefaultExpiration)
-	return node, nil
-}
-
-func writeNode(w http.ResponseWriter, node *linktree.Node) {
-	err := json.NewEncoder(w).Encode(node)
-	if err != nil {
-		log.Printf("Error: %+v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
 // GetTreeNode writes a tree using the root and depth given, has a cache to avoid excessive lookups because building a tree is an expensive operation
 func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
-	lookup := cache.New(5*time.Minute, 10*time.Minute)
+	nodeCache := cache.New(5*time.Minute, 10*time.Minute)
+
+	getNode := func(link string, depth int) (*linktree.Node, error) {
+		parsedLink, err := url.Parse(link)
+		if err != nil {
+			return nil, err
+		}
+		key := fmt.Sprintf("%s-%d", parsedLink.Host, depth)
+		if recentNode, found := nodeCache.Get(key); found {
+			return recentNode.(*linktree.Node), nil
+		}
+
+		log.Printf("processing link %s at a depth of %d\n", link, depth)
+		node := linktree.NewNode(client, link)
+		node.Load(depth)
+		log.Printf("Tree built for %s at depth %d\n", node.URL, depth)
+		nodeCache.Set(key, node, cache.DefaultExpiration)
+		return node, nil
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		writeNode := func(node *linktree.Node) {
+			err := json.NewEncoder(w).Encode(node)
+			if err != nil {
+				log.Printf("Error: %+v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+
 		queryMap := r.URL.Query()
 		link := queryMap.Get("link")
 
@@ -61,13 +62,15 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		node, err := getNode(client, lookup, link, depth)
+
+		// attempt to pull node from cache
+		node, err := getNode(link, depth)
 		if err != nil {
 			log.Printf("Error: %+v\n", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		writeNode(w, node)
+		writeNode(node)
 	}
 }
 
