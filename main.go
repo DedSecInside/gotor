@@ -100,14 +100,8 @@ func writeExcel(node *linktree.Node, depth int) {
 	}
 }
 
-func runServer(host, port string) {
+func runServer(client *http.Client) {
 	router := mux.NewRouter()
-
-	client, err := newTorClient(host, port)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
 
 	router.HandleFunc("/ip", api.GetIP(client)).Methods(http.MethodGet)
 	router.HandleFunc("/emails", api.GetEmails(client)).Methods(http.MethodGet)
@@ -115,11 +109,30 @@ func runServer(host, port string) {
 	router.HandleFunc("/tree", api.GetTreeNode(client)).Methods(http.MethodGet)
 
 	logInfo("Listening on port 8081")
-	err = http.ListenAndServe(":8081", router)
+	err := http.ListenAndServe(":8081", router)
 	if err != nil {
 		logErr(err)
 		return
 	}
+}
+
+func runCli(client *http.Client, root string, depth int, output string) {
+	// handle command line flags
+	if root == "" {
+		flag.CommandLine.Usage()
+		return
+	}
+
+	node := linktree.NewNode(client, root)
+	switch output {
+	case "terminal":
+		writeTerminal(node, depth)
+	case "excel":
+		writeExcel(node, depth)
+	case "tree":
+		writeTree(node, depth)
+	}
+
 }
 
 func main() {
@@ -137,14 +150,15 @@ func main() {
 	flag.BoolVar(&serve, "server", false, "Determines if the program will behave as an HTTP server.")
 	flag.Parse()
 
-	// If the server flag is passed then all other flags are ignored.
-	if serve {
-		runServer(host, port)
+	client, err := newTorClient(host, port)
+	if err != nil {
+		log.Fatal(err)
 		return
 	}
 
-	if root == "" {
-		flag.CommandLine.Usage()
+	// If the server flag is passed then all other flags are ignored.
+	if serve {
+		runServer(client)
 		return
 	}
 
@@ -153,20 +167,5 @@ func main() {
 		flag.CommandLine.Usage()
 		return
 	}
-
-	client, err := newTorClient(host, port)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	node := linktree.NewNode(client, root)
-	switch output {
-	case "terminal":
-		writeTerminal(node, depth)
-	case "excel":
-		writeExcel(node, depth)
-	case "tree":
-		writeTree(node, depth)
-	}
+	runCli(client, root, depth, output)
 }

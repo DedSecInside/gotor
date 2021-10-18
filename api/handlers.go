@@ -18,11 +18,12 @@ import (
 	"golang.org/x/net/html"
 )
 
-// GetTreeNode writes a tree using the root and depth given, has a cache to avoid excessive lookups because building a tree is an expensive operation
-func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
-	nodeCache := cache.New(5*time.Minute, 10*time.Minute)
+type NodeQuery func(link string, depth int) (*linktree.Node, error)
 
-	getNode := func(link string, depth int) (*linktree.Node, error) {
+func createNodeQuery(client *http.Client) NodeQuery {
+	nodeCache := cache.New(time.Minute*5, time.Minute*10) // local cache for querying
+
+	return func(link string, depth int) (*linktree.Node, error) {
 		parsedLink, err := url.Parse(link)
 		if err != nil {
 			return nil, err
@@ -39,16 +40,12 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		nodeCache.Set(key, node, cache.DefaultExpiration)
 		return node, nil
 	}
+}
 
+// GetTreeNode writes a tree using the root and depth given, has a cache to avoid excessive lookups because building a tree is an expensive operation
+func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
+	query := createNodeQuery(client)
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeNode := func(node *linktree.Node) {
-			err := json.NewEncoder(w).Encode(node)
-			if err != nil {
-				log.Printf("Error: %+v\n", err)
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-		}
-
 		queryMap := r.URL.Query()
 		link := queryMap.Get("link")
 
@@ -64,13 +61,17 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		}
 
 		// attempt to pull node from cache
-		node, err := getNode(link, depth)
+		node, err := query(link, depth)
 		if err != nil {
 			log.Printf("Error: %+v\n", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		writeNode(node)
+		err = json.NewEncoder(w).Encode(node)
+		if err != nil {
+			log.Printf("Error: %+v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 }
 
