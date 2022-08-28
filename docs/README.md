@@ -2,7 +2,7 @@
 
 ## Get Tree
 
-### GET `http://localhost:{port}/tree`
+### GET `http://localhost:{port}/tree?link=`
 
 ### Arguments
 - link (string): the root URL of the tree
@@ -25,7 +25,7 @@ e.g. depth of 1
 
 ## Get Emails
 
-### GET `http://localhost:{port}/emails`
+### GET `http://localhost:{port}/emails?link=`
 
 ### Arguments
 - link (string): the root URL of the tree
@@ -36,7 +36,7 @@ e.g. depth of 1
 
 ## Get Phone Numbers
         
-### GET `http://localhost:{port}/phone_numbers` 
+### GET `http://localhost:{port}/phone_numbers?link=` 
                 
 ### Arguments
 - link (string): the root URL of the tree
@@ -51,6 +51,14 @@ e.g. depth of 1
 
 ```
 "Random IP Address"
+```
+
+## Get Web Content
+
+### GET `http://localhost:{port}/content?link=`
+
+```
+"Returns the HTML content of the webpage"
 ```
 
 

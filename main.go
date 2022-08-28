@@ -113,6 +113,7 @@ func runServer(host, port string) {
 	router.HandleFunc("/emails", api.GetEmails(client)).Methods(http.MethodGet)
 	router.HandleFunc("/phone", api.GetPhoneNumbers(client)).Methods(http.MethodGet)
 	router.HandleFunc("/tree", api.GetTreeNode(client)).Methods(http.MethodGet)
+	router.HandleFunc("/content", api.GetWebsiteContent(client)).Methods(http.MethodGet)
 
 	logInfo("Listening on port 8081")
 	err = http.ListenAndServe(":8081", router)
