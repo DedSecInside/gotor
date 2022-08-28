@@ -122,6 +122,43 @@ func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request
 	}
 }
 
+func getWebsiteContent(client *http.Client, link string) string {
+	content := ""
+	resp, err := client.Get(link)
+	if err != nil {
+		log.Println("Error:", err)
+		return content
+	}	
+	defer resp.Body.Close()
+	z := html.NewTokenizer(resp.Body)
+	for {
+		tt := z.Next()
+		switch tt {
+		case html.ErrorToken:
+			return content
+		case html.TextToken:
+			content += z.Token().String()
+		}
+	}
+
+	return content
+	
+}
+
+func GetWebsiteContent(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryMap := r.URL.Query()
+		link := queryMap.Get("link")
+		content := getWebsiteContent(client, link)
+		err := json.NewEncoder(w).Encode(content)
+		if err != nil {
+			log.Println("Error:", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
 // gets the current IP adress of the Tor client
 func getTorIP(client *http.Client) (string, error) {
 	resp, err := client.Get("https://check.torproject.org/")
@@ -132,19 +169,19 @@ func getTorIP(client *http.Client) (string, error) {
 	for {
 		tokenType := tokenizer.Next()
 		switch tokenType {
-		case html.ErrorToken:
-			err := tokenizer.Err()
-			if err != io.EOF {
-				return "", err
-			}
-			return "", nil
-		case html.StartTagToken:
-			token := tokenizer.Token()
-			if token.Data == "strong" {
-				tokenizer.Next()
-				ipToken := tokenizer.Token()
-				return ipToken.Data, nil
-			}
+			case html.ErrorToken:
+				err := tokenizer.Err()
+				if err != io.EOF {
+					return "", err
+				}
+				return "", nil
+			case html.StartTagToken:
+				token := tokenizer.Token()
+				if token.Data == "strong" {
+					tokenizer.Next()
+					ipToken := tokenizer.Token()
+					return ipToken.Data, nil
+				}
 		}
 	}
 }
