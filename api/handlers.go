@@ -1,3 +1,4 @@
+// This file contains HTTP REST handlers for interacting with links
 package api
 
 import (
@@ -10,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/KingAkeem/gotor/pkg/linktree"
 	"golang.org/x/net/html"
 )
 
-// GetTreeNode writes a tree using the root and depth given
+// GetTreeNode returns a LinkTree with the specified depth passed to the query parameter.
 func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
@@ -33,10 +34,12 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		log.Printf("processing link %s at a depth of %d\n", link, depth)
 		node := linktree.NewNode(client, link)
 		node.Load(depth)
-		log.Printf("Tree built for %s at depth %d\n", node.URL, depth)
+		log.Printf("tree built for %s at depth %d\n", node.URL, depth)
+
+		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Println("Error: %", err)
+			log.Println("Error:", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}

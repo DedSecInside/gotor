@@ -7,12 +7,12 @@ import (
 
 	"net/http"
 
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/KingAkeem/gotor/pkg/linktree"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 )
 
-func assertNode(t *testing.T, n *linktree.Node, link string, numChildren int) {
+func assertNode(t *testing.T, n linktree.Node, link string, numChildren int) {
 	assert.Len(t, n.Children, numChildren, "There should be a single child.")
 	assert.Equal(t, n.Status, "OK", "The status should be OK.")
 	assert.Equal(t, n.StatusCode, 200, "The status code should be 200.")
@@ -117,7 +117,6 @@ func TestPhoneNumbers(t *testing.T) {
 	assert.Len(t, phone, 4, "There should be 4 phone numbers.")
 }
 
-
 func TestGetTree(t *testing.T) {
 	// Test getting a tree of depth 1
 	rootLink := "https://www.root.com"
@@ -133,7 +132,7 @@ func TestGetTree(t *testing.T) {
 	node.Load(1)
 	httpmock.DeactivateAndReset()
 
-	assertNode(t, node, rootLink, 1)
+	assertNode(t, *node, rootLink, 1)
 
 	// Test getting a tree of depth 2
 	rootLink = "https://www.root.com"
@@ -153,7 +152,7 @@ func TestGetTree(t *testing.T) {
 	node.Load(2)
 	httpmock.DeactivateAndReset()
 
-	assertNode(t, node, rootLink, 1)
+	assertNode(t, *node, rootLink, 1)
 	assertNode(t, node.Children[0], childLink, 1)
 	assertNode(t, node.Children[0].Children[0], subChildLink, 0)
 }
