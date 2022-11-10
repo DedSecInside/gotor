@@ -141,20 +141,18 @@ func TestGetTree(t *testing.T) {
 	httpmock.Activate()
 	page = newPage("Tree Site", fmt.Sprintf(`<a href="%s">Child Site</a>`, childLink))
 	childPage := newPage("Tree Site", fmt.Sprintf(`<a href="%s">Sub Child Site</a>`, subChildLink))
-	httpmock.RegisterResponder("GET", subChildLink,
-		httpmock.NewStringResponder(200, newPage("Sub Child Site", "")))
-	httpmock.RegisterResponder("GET", childLink,
-		httpmock.NewStringResponder(200, childPage))
-	httpmock.RegisterResponder("GET", rootLink,
-		httpmock.NewStringResponder(200, page))
+	httpmock.RegisterResponder("GET", subChildLink, httpmock.NewStringResponder(200, newPage("Sub Child Site", "")))
+	httpmock.RegisterResponder("GET", childLink, httpmock.NewStringResponder(200, childPage))
+	httpmock.RegisterResponder("GET", rootLink, httpmock.NewStringResponder(200, page))
 
 	node = linktree.NewNode(http.DefaultClient, rootLink)
 	node.Load(2)
-	httpmock.DeactivateAndReset()
+
+	defer httpmock.DeactivateAndReset()
 
 	assertNode(t, *node, rootLink, 1)
-	assertNode(t, node.Children[0], childLink, 1)
-	assertNode(t, node.Children[0].Children[0], subChildLink, 0)
+	assertNode(t, *node.Children[0], childLink, 1)
+	assertNode(t, *node.Children[0].Children[0], subChildLink, 0)
 }
 
 func TestGetWebsiteContent(t *testing.T) {
@@ -162,7 +160,7 @@ func TestGetWebsiteContent(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	httpmock.RegisterResponder("GET", link,
-    	httpmock.NewStringResponder(200, "Hello World"))
+		httpmock.NewStringResponder(200, "Hello World"))
 
 	content := getWebsiteContent(http.DefaultClient, link)
 	assert.Equal(t, "Hello World", content, "The content should be same.")

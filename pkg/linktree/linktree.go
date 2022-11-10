@@ -17,7 +17,7 @@ type Node struct {
 	URL        string       `json:"url"`
 	StatusCode int          `json:"status_code"`
 	Status     string       `json:"status"`
-	Children   []Node       `json:"children"`
+	Children   []*Node      `json:"children"`
 	client     *http.Client `json:"-"`
 	loaded     bool         `json:"-"`
 	lastLoaded time.Time    `json:"-"`
@@ -148,7 +148,7 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 				// Do not add the link as it's own child
 				if parent.URL != link {
 					n := NewNode(parent.client, link)
-					parent.Children = append(parent.Children, *n)
+					parent.Children = append(parent.Children, n)
 					if depth > 1 {
 						depth--
 						tokenStream := streamTokens(n.client, n.URL)
