@@ -157,3 +157,14 @@ func TestGetTree(t *testing.T) {
 	assertNode(t, node.Children[0], childLink, 1)
 	assertNode(t, node.Children[0].Children[0], subChildLink, 0)
 }
+
+func TestGetWebsiteContent(t *testing.T) {
+	link := "https://www.random.com"
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+	httpmock.RegisterResponder("GET", link,
+    	httpmock.NewStringResponder(200, "Hello World"))
+
+	content := getWebsiteContent(http.DefaultClient, link)
+	assert.Equal(t, "Hello World", content, "The content should be same.")
+}
