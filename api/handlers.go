@@ -24,7 +24,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		if err != nil {
 			_, err := w.Write([]byte("Invalid depth. Must be an integer."))
 			if err != nil {
-				log.Println("Error:", err)
+				log.Printf("Error: %+v\n", err)
 			}
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -39,7 +39,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Println("Error:", err)
+			log.Printf("Error: %+v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -103,7 +103,9 @@ func getPhoneNumbers(client *http.Client, link string) []string {
 	collectLinks := func(childLink string) {
 		linkPieces := strings.Split(childLink, "tel:")
 		if len(linkPieces) > 1 {
-			phone = append(phone, linkPieces[1])
+			if len(linkPieces[1]) > 0 {
+				phone = append(phone, linkPieces[1])
+			}
 		}
 	}
 	node.Crawl(depth, collectLinks)
@@ -131,7 +133,7 @@ func getWebsiteContent(client *http.Client, link string) string {
 	if err != nil {
 		log.Println("Error:", err)
 		return content
-	}	
+	}
 	defer resp.Body.Close()
 	z := html.NewTokenizer(resp.Body)
 	for {
@@ -145,7 +147,7 @@ func getWebsiteContent(client *http.Client, link string) string {
 	}
 
 	return content
-	
+
 }
 
 func GetWebsiteContent(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
@@ -172,19 +174,19 @@ func getTorIP(client *http.Client) (string, error) {
 	for {
 		tokenType := tokenizer.Next()
 		switch tokenType {
-			case html.ErrorToken:
-				err := tokenizer.Err()
-				if err != io.EOF {
-					return "", err
-				}
-				return "", nil
-			case html.StartTagToken:
-				token := tokenizer.Token()
-				if token.Data == "strong" {
-					tokenizer.Next()
-					ipToken := tokenizer.Token()
-					return ipToken.Data, nil
-				}
+		case html.ErrorToken:
+			err := tokenizer.Err()
+			if err != io.EOF {
+				return "", err
+			}
+			return "", nil
+		case html.StartTagToken:
+			token := tokenizer.Token()
+			if token.Data == "strong" {
+				tokenizer.Next()
+				ipToken := tokenizer.Token()
+				return ipToken.Data, nil
+			}
 		}
 	}
 }
