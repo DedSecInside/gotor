@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -24,8 +25,12 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		if err != nil {
 			_, err := w.Write([]byte("Invalid depth. Must be an integer."))
 			if err != nil {
-				log.Printf("Error: %+v\n", err)
+				log.Printf("Unable to write error message. Error: %+v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
+
+			log.Println(err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -39,7 +44,7 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Printf("Error: %+v\n", err)
+			log.Printf("Unable to marshal link node. Error: %+v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -48,8 +53,8 @@ func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Reques
 
 var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
-// isEmailValid checks if the email provided passes the required structure
-// and length test. It also checks the domain has a valid MX record.
+// isEmailValid checks if the email provided passes the required structure and length test.
+// It also checks the domain has a valid DNS MX record.
 func isEmailValid(e string) bool {
 	if len(e) < 3 && len(e) > 254 {
 		return false
@@ -67,20 +72,20 @@ func isEmailValid(e string) bool {
 
 // gets any email addresses on the url passed
 func getEmails(client *http.Client, link string) []string {
-	links := []string{}
+	emails := []string{}
 	node := linktree.NewNode(client, link)
 	depth := 1
-	collectLinks := func(childLink string) {
+	collectEmails := func(childLink string) {
 		linkPieces := strings.Split(childLink, "mailto:")
 		if len(linkPieces) > 1 && isEmailValid(linkPieces[1]) {
-			links = append(links, linkPieces[1])
+			emails = append(emails, linkPieces[1])
 		}
 	}
-	node.Crawl(depth, collectLinks)
-	return links
+	node.Crawl(depth, collectEmails)
+	return emails
 }
 
-// GetEmails ...
+// GetEmails writes an array of emails found on the given "link" passed in the query parameters by the client
 func GetEmails(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
@@ -95,12 +100,12 @@ func GetEmails(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// gets any phone number addresses on the url passed
+// returns a slice of phone numbers found at a link
 func getPhoneNumbers(client *http.Client, link string) []string {
 	phone := []string{}
 	node := linktree.NewNode(client, link)
 	depth := 1
-	collectLinks := func(childLink string) {
+	collectNumbers := func(childLink string) {
 		linkPieces := strings.Split(childLink, "tel:")
 		if len(linkPieces) > 1 {
 			if len(linkPieces[1]) > 0 {
@@ -108,11 +113,11 @@ func getPhoneNumbers(client *http.Client, link string) []string {
 			}
 		}
 	}
-	node.Crawl(depth, collectLinks)
+	node.Crawl(depth, collectNumbers)
 	return phone
 }
 
-// GetPhone number ...
+// GetPhoneNumbers writes a list of phone numbers using the `tel:` tag
 func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
@@ -127,35 +132,36 @@ func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func getWebsiteContent(client *http.Client, link string) string {
-	content := ""
+// returns the body of a website as a string
+func getWebsiteContent(client *http.Client, link string) (string, error) {
 	resp, err := client.Get(link)
 	if err != nil {
-		log.Println("Error:", err)
-		return content
+		log.Println(err)
+		return "", err
 	}
 	defer resp.Body.Close()
-	z := html.NewTokenizer(resp.Body)
-	for {
-		tt := z.Next()
-		switch tt {
-		case html.ErrorToken:
-			return content
-		case html.TextToken:
-			content += z.Token().String()
-		}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return "", err
 	}
 
-	return content
-
+	return string(body), nil
 }
 
 func GetWebsiteContent(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryMap := r.URL.Query()
 		link := queryMap.Get("link")
-		content := getWebsiteContent(client, link)
-		err := json.NewEncoder(w).Encode(content)
+		content, err := getWebsiteContent(client, link)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(content)
 		if err != nil {
 			log.Println("Error:", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -164,12 +170,13 @@ func GetWebsiteContent(client *http.Client) func(w http.ResponseWriter, r *http.
 	}
 }
 
-// gets the current IP adress of the Tor client
+// gets the current IP address of the Tor client
 func getTorIP(client *http.Client) (string, error) {
 	resp, err := client.Get("https://check.torproject.org/")
 	if err != nil {
 		return "", err
 	}
+
 	tokenizer := html.NewTokenizer(resp.Body)
 	for {
 		tokenType := tokenizer.Next()
@@ -191,18 +198,16 @@ func getTorIP(client *http.Client) (string, error) {
 	}
 }
 
-// GetIP ...
+// GetIP writes the IP address of the current TOR connection being used
 func GetIP(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip, err := getTorIP(c)
 		if err != nil {
-			_, err = w.Write([]byte(err.Error()))
-			if err != nil {
-				log.Println("Error:", err)
-			}
+			log.Println("Error:", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
 		_, err = w.Write([]byte(ip))
 		if err != nil {
 			log.Println("Error:", err)

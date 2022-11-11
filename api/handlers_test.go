@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"net/http"
@@ -19,102 +18,81 @@ func assertNode(t *testing.T, n linktree.Node, link string, numChildren int) {
 	assert.Equal(t, n.URL, link, fmt.Sprintf("Node URL should be %s", link))
 }
 
-func assertEmails(t *testing.T, emails []string, expectedEmails []string) {
-	assert.Len(t, emails, len(expectedEmails), "The expected email slice contains invalid emails.")
-	for _, expectedEmail := range expectedEmails {
-		provider := strings.Split(expectedEmail, "@")[1]
-		errMsg := fmt.Sprintf("%s address not parsed.", provider)
-		assert.Contains(t, emails, expectedEmail, errMsg)
-	}
-}
-
 func newPage(title, body string) string {
-	baseHTML := `<!DOCTYPE html>
+	baseHTML := `
+		<!DOCTYPE html>
 		<html lang=en-US class=no-js>
-			<head><title>%s</title></head>
+			<head>
+				<title>%s</title>
+			</head>
 			<body>%s</body>
-	</html>`
+		</html>
+	`
 	return fmt.Sprintf(baseHTML, title, body)
 }
 
 func TestGetTorIP(t *testing.T) {
 	httpmock.Activate()
-	page := newPage("Tor Project", "<strong>Random IP Address</strong>")
-	httpmock.RegisterResponder("GET", "https://check.torproject.org/",
-		httpmock.NewStringResponder(200, page))
+	defer httpmock.DeactivateAndReset()
 
 	ip, err := getTorIP(http.DefaultClient)
-	if err != nil {
-		t.Error(err)
-	}
-	httpmock.DeactivateAndReset()
+	// an error is expected since nothing has been registered yet
+	assert.NotNil(t, err)
+	assert.Equal(t, ip, "", "There should be no IP address.")
+
+	page := newPage("Tor Project", "<strong>Random IP Address</strong>")
+	httpmock.RegisterResponder("GET", "https://check.torproject.org/", httpmock.NewStringResponder(200, page))
+	ip, err = getTorIP(http.DefaultClient)
+	assert.Nil(t, err)
 	assert.Equal(t, ip, "Random IP Address", "The IP address was not successfully extracted.")
 
-	httpmock.Activate()
 	page = newPage("Tor Project", "")
-	httpmock.RegisterResponder("GET", "https://check.torproject.org/",
-		httpmock.NewStringResponder(200, page))
-
+	httpmock.RegisterResponder("GET", "https://check.torproject.org/", httpmock.NewStringResponder(200, page))
 	ip, err = getTorIP(http.DefaultClient)
-	if err != nil {
-		t.Error(err)
-	}
-	httpmock.DeactivateAndReset()
+	assert.Nil(t, err)
 	assert.Equal(t, ip, "", "There should be no IP address.")
 }
 
 func TestGetEmails(t *testing.T) {
 	link := "https://www.random.com"
 	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
 	page := newPage("Random Site", `<a href="mailto:random@gmail.com">Email me</a>`)
-	httpmock.RegisterResponder("GET", link,
-		httpmock.NewStringResponder(200, page))
+	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
 
 	emails := getEmails(http.DefaultClient, link)
-	httpmock.DeactivateAndReset()
-
 	assert.Contains(t, emails, "random@gmail.com", "random@gmail.com should be in emails slice")
 	assert.Len(t, emails, 1, "Found more than 1 email address.")
 
-	httpmock.Activate()
 	page = newPage("Random Site", `<a href="mailto:random@gmail.com">email me</a>
 					<a href="mailto:random@yahoo.com">email me</a>
 					<a href="mailto:random@protonmail.com">email me</a>
 					<a href="mailto:random@outlook.com">email me</a>`)
-	httpmock.RegisterResponder("GET", link,
-		httpmock.NewStringResponder(200, page))
+	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
 
 	emails = getEmails(http.DefaultClient, link)
-	httpmock.DeactivateAndReset()
-
-	assertEmails(t, emails, []string{"random@gmail.com", "random@protonmail.com", "random@outlook.com", "random@yahoo.com"})
+	assert.ElementsMatch(t, emails, []string{"random@gmail.com", "random@protonmail.com", "random@outlook.com", "random@yahoo.com"})
 }
 
 func TestPhoneNumbers(t *testing.T) {
 	link := "https://www.random.com"
 	httpmock.Activate()
-	page := newPage("Random Site", `<a href="tel:+1-555-555-5555">Call me</a>`)
-	httpmock.RegisterResponder("GET", link,
-		httpmock.NewStringResponder(200, page))
-	phone := getPhoneNumbers(http.DefaultClient, link)
-	httpmock.DeactivateAndReset()
-	assert.Contains(t, phone, "+1-555-555-5555", "The phone number should be in the slice.")
-	assert.Len(t, phone, 1, "There should be only one phone number.")
+	defer httpmock.DeactivateAndReset()
 
-	httpmock.Activate()
+	page := newPage("Random Site", `<a href="tel:+1-555-555-5555">Call me</a>`)
+	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
+	number := getPhoneNumbers(http.DefaultClient, link)
+	assert.Contains(t, number, "+1-555-555-5555", "The phone number should be in the slice.")
+	assert.Len(t, number, 1, "There should be only one phone number.")
+
 	page = newPage("Random Site", `<a href="tel:+1-555-555-5555">call me</a>
 					<a href="tel:+1-555-555-5556">call me</a>
 					<a href="tel:+1-555-555-5557">call me</a>
 					<a href="tel:+1-555-555-5558">call me</a>`)
-	httpmock.RegisterResponder("GET", link,
-		httpmock.NewStringResponder(200, page))
-	phone = getPhoneNumbers(http.DefaultClient, link)
-	httpmock.DeactivateAndReset()
-	assert.Contains(t, phone, "+1-555-555-5555", "The phone number should be in the slice.")
-	assert.Contains(t, phone, "+1-555-555-5556", "The phone number should be in the slice.")
-	assert.Contains(t, phone, "+1-555-555-5557", "The phone number should be in the slice.")
-	assert.Contains(t, phone, "+1-555-555-5558", "The phone number should be in the slice.")
-	assert.Len(t, phone, 4, "There should be 4 phone numbers.")
+	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
+	numbers := getPhoneNumbers(http.DefaultClient, link)
+	assert.ElementsMatch(t, numbers, []string{"+1-555-555-5555", "+1-555-555-5556", "+1-555-555-5557", "+1-555-555-5558"})
 }
 
 func TestGetTree(t *testing.T) {
@@ -122,23 +100,20 @@ func TestGetTree(t *testing.T) {
 	rootLink := "https://www.root.com"
 	childLink := "https://www.child.com"
 	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
 	page := newPage("Tree Site", fmt.Sprintf(`<a href="%s">Child Site</a>`, childLink))
-	httpmock.RegisterResponder("GET", childLink,
-		httpmock.NewStringResponder(200, newPage("Child Site", "")))
-	httpmock.RegisterResponder("GET", rootLink,
-		httpmock.NewStringResponder(200, page))
+	httpmock.RegisterResponder("GET", childLink, httpmock.NewStringResponder(200, newPage("Child Site", "")))
+	httpmock.RegisterResponder("GET", rootLink, httpmock.NewStringResponder(200, page))
 
 	node := linktree.NewNode(http.DefaultClient, rootLink)
 	node.Load(1)
-	httpmock.DeactivateAndReset()
-
 	assertNode(t, *node, rootLink, 1)
 
 	// Test getting a tree of depth 2
 	rootLink = "https://www.root.com"
 	childLink = "https://www.child.com"
 	subChildLink := "https://www.subchild.com"
-	httpmock.Activate()
 	page = newPage("Tree Site", fmt.Sprintf(`<a href="%s">Child Site</a>`, childLink))
 	childPage := newPage("Tree Site", fmt.Sprintf(`<a href="%s">Sub Child Site</a>`, subChildLink))
 	httpmock.RegisterResponder("GET", subChildLink, httpmock.NewStringResponder(200, newPage("Sub Child Site", "")))
@@ -147,8 +122,6 @@ func TestGetTree(t *testing.T) {
 
 	node = linktree.NewNode(http.DefaultClient, rootLink)
 	node.Load(2)
-
-	defer httpmock.DeactivateAndReset()
 
 	assertNode(t, *node, rootLink, 1)
 	assertNode(t, *node.Children[0], childLink, 1)
@@ -159,9 +132,14 @@ func TestGetWebsiteContent(t *testing.T) {
 	link := "https://www.random.com"
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
-	httpmock.RegisterResponder("GET", link,
-		httpmock.NewStringResponder(200, "Hello World"))
 
-	content := getWebsiteContent(http.DefaultClient, link)
-	assert.Equal(t, "Hello World", content, "The content should be same.")
+	content, err := getWebsiteContent(http.DefaultClient, link)
+	assert.NotNil(t, err)
+	assert.Equal(t, "", content)
+
+	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, "Hello World"))
+
+	content, err = getWebsiteContent(http.DefaultClient, link)
+	assert.Nil(t, err)
+	assert.Equal(t, "Hello World", content)
 }

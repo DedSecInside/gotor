@@ -34,16 +34,15 @@ func (n *Node) PrintTree() {
 	}
 }
 
-// UpdateStatus updates the status of the URL
+// UpdateStatus gets the current status of the node's URL
 func (n *Node) updateStatus() {
-	resp, err := n.client.Get(n.URL)
-	if err != nil {
-		n.Status = "UNKNOWN"
+	if resp, err := n.client.Get(n.URL); err != nil {
+		n.Status = http.StatusText(http.StatusInternalServerError)
 		n.StatusCode = http.StatusInternalServerError
-		return
+	} else {
+		n.Status = http.StatusText(resp.StatusCode)
+		n.StatusCode = resp.StatusCode
 	}
-	n.Status = http.StatusText(resp.StatusCode)
-	n.StatusCode = resp.StatusCode
 }
 
 func isValidURL(URL string) bool {
