@@ -45,7 +45,7 @@ func TestLoadNode(t *testing.T) {
 	link := "https://www.test.com"
 	n := NewNode(http.DefaultClient, link)
 	n.Load(1)
-	assert.True(t, n.Loaded)
+	assert.True(t, n.loaded)
 
 	page := newPage("test", `<a href="https://www.child1.com">link to child</a>`)
 	httpmock.RegisterResponder(http.MethodGet, link,
@@ -53,7 +53,7 @@ func TestLoadNode(t *testing.T) {
 
 	n = NewNode(http.DefaultClient, link)
 	n.Load(1)
-	assert.True(t, n.Loaded)
+	assert.True(t, n.loaded)
 	assert.Len(t, n.Children, 1)
 
 	httpmock.DeactivateAndReset()

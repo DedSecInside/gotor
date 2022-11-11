@@ -7,12 +7,12 @@ import (
 
 	"net/http"
 
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/KingAkeem/gotor/pkg/linktree"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 )
 
-func assertNode(t *testing.T, n *linktree.Node, link string, numChildren int) {
+func assertNode(t *testing.T, n linktree.Node, link string, numChildren int) {
 	assert.Len(t, n.Children, numChildren, "There should be a single child.")
 	assert.Equal(t, n.Status, "OK", "The status should be OK.")
 	assert.Equal(t, n.StatusCode, 200, "The status code should be 200.")
@@ -117,7 +117,6 @@ func TestPhoneNumbers(t *testing.T) {
 	assert.Len(t, phone, 4, "There should be 4 phone numbers.")
 }
 
-
 func TestGetTree(t *testing.T) {
 	// Test getting a tree of depth 1
 	rootLink := "https://www.root.com"
@@ -133,7 +132,7 @@ func TestGetTree(t *testing.T) {
 	node.Load(1)
 	httpmock.DeactivateAndReset()
 
-	assertNode(t, node, rootLink, 1)
+	assertNode(t, *node, rootLink, 1)
 
 	// Test getting a tree of depth 2
 	rootLink = "https://www.root.com"
@@ -142,20 +141,18 @@ func TestGetTree(t *testing.T) {
 	httpmock.Activate()
 	page = newPage("Tree Site", fmt.Sprintf(`<a href="%s">Child Site</a>`, childLink))
 	childPage := newPage("Tree Site", fmt.Sprintf(`<a href="%s">Sub Child Site</a>`, subChildLink))
-	httpmock.RegisterResponder("GET", subChildLink,
-		httpmock.NewStringResponder(200, newPage("Sub Child Site", "")))
-	httpmock.RegisterResponder("GET", childLink,
-		httpmock.NewStringResponder(200, childPage))
-	httpmock.RegisterResponder("GET", rootLink,
-		httpmock.NewStringResponder(200, page))
+	httpmock.RegisterResponder("GET", subChildLink, httpmock.NewStringResponder(200, newPage("Sub Child Site", "")))
+	httpmock.RegisterResponder("GET", childLink, httpmock.NewStringResponder(200, childPage))
+	httpmock.RegisterResponder("GET", rootLink, httpmock.NewStringResponder(200, page))
 
 	node = linktree.NewNode(http.DefaultClient, rootLink)
 	node.Load(2)
-	httpmock.DeactivateAndReset()
 
-	assertNode(t, node, rootLink, 1)
-	assertNode(t, node.Children[0], childLink, 1)
-	assertNode(t, node.Children[0].Children[0], subChildLink, 0)
+	defer httpmock.DeactivateAndReset()
+
+	assertNode(t, *node, rootLink, 1)
+	assertNode(t, *node.Children[0], childLink, 1)
+	assertNode(t, *node.Children[0].Children[0], subChildLink, 0)
 }
 
 func TestGetWebsiteContent(t *testing.T) {
@@ -163,7 +160,7 @@ func TestGetWebsiteContent(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	httpmock.RegisterResponder("GET", link,
-    	httpmock.NewStringResponder(200, "Hello World"))
+		httpmock.NewStringResponder(200, "Hello World"))
 
 	content := getWebsiteContent(http.DefaultClient, link)
 	assert.Equal(t, "Hello World", content, "The content should be same.")

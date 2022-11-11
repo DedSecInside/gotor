@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/KingAkeem/gotor/api"
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/KingAkeem/gotor/pkg/linktree"
 	"github.com/gorilla/mux"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
@@ -43,9 +43,9 @@ func writeTree(node *linktree.Node, depth int) {
 	node.PrintTree()
 }
 
-func writeTerminal(node *linktree.Node, depth int) {
+func writeTerminal(client *http.Client, node *linktree.Node, depth int) {
 	printStatus := func(link string) {
-		n := linktree.NewNode(node.Client, link)
+		n := linktree.NewNode(client, link)
 		markError := ansi.ColorFunc("red")
 		markSuccess := ansi.ColorFunc("green")
 		if n.StatusCode != 200 {
@@ -57,7 +57,7 @@ func writeTerminal(node *linktree.Node, depth int) {
 	node.Crawl(depth, printStatus)
 }
 
-func writeExcel(node *linktree.Node, depth int) {
+func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 	f := excelize.NewFile()
 	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
 	if err != nil {
@@ -71,7 +71,7 @@ func writeExcel(node *linktree.Node, depth int) {
 	}
 	row := 2
 	addRow := func(link string) {
-		node := linktree.NewNode(node.Client, link)
+		node := linktree.NewNode(client, link)
 		linkCell := fmt.Sprintf("A%d", row)
 		statusCell := fmt.Sprintf("B%d", row)
 		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
@@ -134,7 +134,7 @@ func main() {
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
-	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal.")
+	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal. Options are terminal, excel sheet (using xlsx) or tree (a tree representation will be visually printed in text)")
 	flag.BoolVar(&serve, "server", false, "Determines if the program will behave as an HTTP server.")
 	flag.Parse()
 
@@ -164,9 +164,9 @@ func main() {
 	node := linktree.NewNode(client, root)
 	switch output {
 	case "terminal":
-		writeTerminal(node, depth)
+		writeTerminal(client, node, depth)
 	case "excel":
-		writeExcel(node, depth)
+		writeExcel(client, node, depth)
 	case "tree":
 		writeTree(node, depth)
 	}
