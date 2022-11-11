@@ -75,7 +75,7 @@ func TestGetEmails(t *testing.T) {
 	assert.ElementsMatch(t, emails, []string{"random@gmail.com", "random@protonmail.com", "random@outlook.com", "random@yahoo.com"})
 }
 
-func TestPhoneNumbers(t *testing.T) {
+func TestGetPhoneNumbers(t *testing.T) {
 	link := "https://www.random.com"
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
