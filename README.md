@@ -5,7 +5,8 @@
 [![Open Source Helpers](https://www.codetriage.com/kingakeem/gotor/badges/users.svg)](https://www.codetriage.com/kingakeem/gotor)
 [![](https://img.shields.io/badge/Made%20with-Go-blue.svg?style=flat-square)]()
 
-This is a HTTP REST API and command line program for webcrawling Tor (and non Tor) sites.
+This is an HTTP REST API and command line program to gather and analyze data using web-crawling via TOR.
+The program is meant to be used in tandem with [TorBot](https://github.com/DedSecInside/TorBot), but the API and CLI can be run separately.
 
 ### Flags
 #### Configuration of Tor client
