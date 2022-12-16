@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/KingAkeem/gotor/internal/logger"
 	"github.com/KingAkeem/gotor/pkg/linktree"
 	"golang.org/x/net/html"
 )
@@ -19,32 +20,40 @@ import (
 // GetTreeNode returns a LinkTree with the specified depth passed to the query parameter.
 func GetTreeNode(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryMap := r.URL.Query()
-		depthInput := queryMap.Get("depth")
+		depthInput := r.URL.Query().Get("depth")
 		depth, err := strconv.Atoi(depthInput)
 		if err != nil {
-			_, err := w.Write([]byte("Invalid depth. Must be an integer."))
-			if err != nil {
-				log.Printf("Unable to write error message. Error: %+v\n", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			log.Println(err)
+			msg := "invalid depth, must be an integer"
+			logger.Error(msg, "error", err.Error())
+			w.Write([]byte(msg))
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		link := queryMap.Get("link")
-		log.Printf("processing link %s at a depth of %d\n", link, depth)
+		link := r.URL.Query().Get("link")
+		if link == "" {
+			logger.Error("found blank link")
+			w.Write([]byte("Link cannot be blank."))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		logger.Info("attempting to build new tree from request",
+			"root", link,
+			"depth", depth,
+		)
 		node := linktree.NewNode(client, link)
 		node.Load(depth)
-		log.Printf("tree built for %s at depth %d\n", node.URL, depth)
+		logger.Info("build successful",
+			"node", node,
+		)
 
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(node)
 		if err != nil {
-			log.Printf("Unable to marshal link node. Error: %+v\n", err)
+			logger.Error("unable to marshal node",
+				"error", err,
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -88,12 +97,19 @@ func getEmails(client *http.Client, link string) []string {
 // GetEmails writes an array of emails found on the given "link" passed in the query parameters by the client
 func GetEmails(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryMap := r.URL.Query()
-		link := queryMap.Get("link")
+		link := r.URL.Query().Get("link")
+		logger.Info("attempting to collect emails",
+			"link", link,
+		)
 		emails := getEmails(c, link)
+		logger.Info("emails collected",
+			"emails", emails,
+		)
 		err := json.NewEncoder(w).Encode(emails)
 		if err != nil {
-			log.Println("Error:", err)
+			logger.Error("unable to marshal",
+				"error", err,
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -120,12 +136,19 @@ func getPhoneNumbers(client *http.Client, link string) []string {
 // GetPhoneNumbers writes a list of phone numbers using the `tel:` tag
 func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryMap := r.URL.Query()
-		link := queryMap.Get("link")
+		link := r.URL.Query().Get("link")
+		logger.Info("attempting to collect phone numbers",
+			"link", link,
+		)
 		phone := getPhoneNumbers(c, link)
+		logger.Info("numbers collected",
+			"numbers", phone,
+		)
 		err := json.NewEncoder(w).Encode(phone)
 		if err != nil {
-			log.Println("Error:", err)
+			logger.Error("unable to marshal",
+				"error", err,
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -152,18 +175,23 @@ func getWebsiteContent(client *http.Client, link string) (string, error) {
 
 func GetWebsiteContent(client *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryMap := r.URL.Query()
-		link := queryMap.Get("link")
+		link := r.URL.Query().Get("link")
+		logger.Info("attempting to collect website content",
+			"link", link,
+		)
 		content, err := getWebsiteContent(client, link)
 		if err != nil {
-			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
+		logger.Info("content collected",
+			"content", content,
+		)
 		err = json.NewEncoder(w).Encode(content)
 		if err != nil {
-			log.Println("Error:", err)
+			logger.Error("unable to marshal",
+				"error", err,
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -201,16 +229,21 @@ func getTorIP(client *http.Client) (string, error) {
 // GetIP writes the IP address of the current TOR connection being used
 func GetIP(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("retrieving local tor IP")
 		ip, err := getTorIP(c)
 		if err != nil {
-			log.Println("Error:", err)
+			logger.Error("unable to retrieve IP",
+				"error", err,
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		_, err = w.Write([]byte(ip))
 		if err != nil {
-			log.Println("Error:", err)
+			logger.Error("unable to write IP",
+				"error", err,
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
