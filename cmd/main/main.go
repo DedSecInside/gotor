@@ -9,19 +9,12 @@ import (
 	"strconv"
 
 	"github.com/KingAkeem/gotor/api"
+	"github.com/KingAkeem/gotor/internal/logger"
 	"github.com/KingAkeem/gotor/pkg/linktree"
 	"github.com/gorilla/mux"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 )
-
-func logInfo(msg string) {
-	log.Println(ansi.Color(msg, "blue"))
-}
-
-func logErr(err error) {
-	log.Println(ansi.Color(err.Error(), "red"))
-}
 
 // creates a http client using socks5 proxy
 func newTorClient(host, port string) (*http.Client, error) {
@@ -100,14 +93,8 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 	}
 }
 
-func runServer(host, port string) {
+func runServer(client *http.Client, host, port string) {
 	router := mux.NewRouter()
-
-	client, err := newTorClient(host, port)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
 
 	router.HandleFunc("/ip", api.GetIP(client)).Methods(http.MethodGet)
 	router.HandleFunc("/emails", api.GetEmails(client)).Methods(http.MethodGet)
@@ -115,37 +102,61 @@ func runServer(host, port string) {
 	router.HandleFunc("/tree", api.GetTreeNode(client)).Methods(http.MethodGet)
 	router.HandleFunc("/content", api.GetWebsiteContent(client)).Methods(http.MethodGet)
 
-	logInfo("Listening on port 8081")
-	err = http.ListenAndServe(":8081", router)
+	logger.Info("attempting to start local gotor server",
+		"port", "8081",
+	)
+
+	err := http.ListenAndServe(":8081", router)
 	if err != nil {
-		logErr(err)
+		logger.Error("unable to start server",
+			"error", err.Error(),
+		)
 		return
 	}
 }
 
 func main() {
 	var root string
-	var host string
-	var port string
-	var depthInput string
-	var output string
-	var serve bool
 	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
+
+	var depthInput string
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
+
+	var host string
 	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+
+	var port string
 	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
+
+	var output string
 	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal. Options are terminal, excel sheet (using xlsx) or tree (a tree representation will be visually printed in text)")
+
+	var serve bool
 	flag.BoolVar(&serve, "server", false, "Determines if the program will behave as an HTTP server.")
+
 	flag.Parse()
 
-	// If the server flag is passed then all other flags are ignored.
-	if serve {
-		runServer(host, port)
+	// If not serving and not root is passed, there's nothing to do
+	if !serve && root == "" {
+		flag.CommandLine.Usage()
 		return
 	}
 
-	if root == "" {
-		flag.CommandLine.Usage()
+	logger.Info("connecting to tor",
+		"host", host,
+		"port", port,
+	)
+	client, err := newTorClient(host, port)
+	if err != nil {
+		logger.Error("unable to connect to tor",
+			"error", err.Error(),
+		)
+		return
+	}
+
+	// If the server flag is passed then all other flags are ignored.
+	if serve {
+		runServer(client, host, port)
 		return
 	}
 
@@ -155,12 +166,11 @@ func main() {
 		return
 	}
 
-	client, err := newTorClient(host, port)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
+	logger.Info("starting tree with root",
+		"root", root,
+		"depth", depth,
+		"output", output,
+	)
 	node := linktree.NewNode(client, root)
 	switch output {
 	case "terminal":
