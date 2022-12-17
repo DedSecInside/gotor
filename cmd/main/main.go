@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -54,14 +53,14 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 	f := excelize.NewFile()
 	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
 	if err != nil {
-		log.Fatal(err)
-		return
+		logger.Fatal("unable to set sheet name", "error", err)
 	}
+
 	err = f.SetCellStr(f.GetSheetName(0), "B1", "Status")
 	if err != nil {
-		log.Fatal(err)
-		return
+		logger.Fatal(err.Error())
 	}
+
 	row := 2
 	addRow := func(link string) {
 		node := linktree.NewNode(client, link)
@@ -69,27 +68,31 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 		statusCell := fmt.Sprintf("B%d", row)
 		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
 		if err != nil {
-			log.Fatal(err)
-			return
+			logger.Fatal(err.Error())
 		}
+
 		err = f.SetCellStr(f.GetSheetName(0), statusCell, fmt.Sprintf("%d %s", node.StatusCode, node.Status))
 		if err != nil {
-			log.Fatal(err)
-			return
+			logger.Fatal(err.Error())
 		}
 		row++
 	}
 	node.Crawl(depth, addRow)
 	u, err := url.Parse(node.URL)
 	if err != nil {
-		log.Fatal(err)
-		return
+		logger.Fatal("unable to parse node URL",
+			"url", node.URL,
+			"error", err.Error(),
+		)
 	}
+
 	filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
 	err = f.SaveAs(filename)
 	if err != nil {
-		log.Fatal(err)
-		return
+		logger.Fatal("unable to save excel file",
+			"filename", filename,
+			"error", err.Error(),
+		)
 	}
 }
 

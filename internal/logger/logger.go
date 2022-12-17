@@ -30,3 +30,7 @@ func Warn(msg string, keysAndValues ...interface{}) {
 func Error(msg string, keysAndValues ...interface{}) {
 	zapper.Sugar().Errorw(msg, keysAndValues...)
 }
+
+func Fatal(msg string, keysAndValues ...interface{}) {
+	zapper.Sugar().Fatalw(msg)
+}

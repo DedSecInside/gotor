@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"regexp"
@@ -161,14 +160,12 @@ func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request
 func getWebsiteContent(client *http.Client, link string) (string, error) {
 	resp, err := client.Get(link)
 	if err != nil {
-		log.Println(err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
 		return "", err
 	}
 
