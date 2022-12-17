@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/KingAkeem/gotor/api"
+	"github.com/KingAkeem/gotor/internal/config"
 	"github.com/KingAkeem/gotor/internal/logger"
 	"github.com/KingAkeem/gotor/pkg/linktree"
 	"github.com/gorilla/mux"
@@ -96,7 +97,7 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 	}
 }
 
-func runServer(client *http.Client, host, port string) {
+func runServer(client *http.Client) {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/ip", api.GetIP(client)).Methods(http.MethodGet)
@@ -117,6 +118,7 @@ func runServer(client *http.Client, host, port string) {
 }
 
 func main() {
+	cfg := config.GetConfig()
 	var root string
 	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
 
@@ -124,10 +126,10 @@ func main() {
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 
 	var host string
-	flag.StringVar(&host, "h", "127.0.0.1", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+	flag.StringVar(&host, "h", cfg.Proxy.Host, "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 
 	var port string
-	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
+	flag.StringVar(&port, "p", cfg.Proxy.Port, "The port used for the SOCKS5 proxy. Defaults to 9050.")
 
 	var output string
 	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal. Options are terminal, excel sheet (using xlsx) or tree (a tree representation will be visually printed in text)")
@@ -157,7 +159,7 @@ func main() {
 
 	// If the server flag is passed then all other flags are ignored.
 	if serve {
-		runServer(client, host, port)
+		runServer(client)
 		return
 	}
 
