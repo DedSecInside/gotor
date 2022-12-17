@@ -247,5 +247,6 @@ func GetIP(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		logger.Info("Successfully sent IP", "ip", ip)
 	}
 }

@@ -108,13 +108,11 @@ func runServer(client *http.Client, host, port string) {
 	logger.Info("attempting to start local gotor server",
 		"port", "8081",
 	)
-
 	err := http.ListenAndServe(":8081", router)
 	if err != nil {
-		logger.Error("unable to start server",
+		logger.Fatal("unable to start server",
 			"error", err.Error(),
 		)
-		return
 	}
 }
 
