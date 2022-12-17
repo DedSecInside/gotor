@@ -103,6 +103,7 @@ func GetEmails(c *http.Client) func(w http.ResponseWriter, r *http.Request) {
 		)
 		emails := getEmails(c, link)
 		logger.Info("emails collected",
+			"link", link,
 			"emails", emails,
 		)
 		err := json.NewEncoder(w).Encode(emails)
@@ -142,6 +143,7 @@ func GetPhoneNumbers(c *http.Client) func(w http.ResponseWriter, r *http.Request
 		)
 		phone := getPhoneNumbers(c, link)
 		logger.Info("numbers collected",
+			"link", link,
 			"numbers", phone,
 		)
 		err := json.NewEncoder(w).Encode(phone)
@@ -185,6 +187,7 @@ func GetWebsiteContent(client *http.Client) func(w http.ResponseWriter, r *http.
 			return
 		}
 		logger.Info("content collected",
+			"link", link,
 			"content", content,
 		)
 		err = json.NewEncoder(w).Encode(content)
