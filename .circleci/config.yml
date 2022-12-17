@@ -17,7 +17,19 @@ jobs:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+
+  test:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/golang:latest
+    steps:
       - run:
           name: Run tests
           command: |
                   go test ./... -v -cover
+workflows:
+  version: 1
+  build_and_test:
+    jobs:
+      - build
+      - test
