@@ -28,7 +28,6 @@ func GetConfig() *Config {
 func init() {
 	err := godotenv.Load(".env")
 	if err != nil {
-		zap.L().Sugar().Infow("unable to load .env, program may behave strangely without environment variables",
 			"error", err,
 		)
 		return
