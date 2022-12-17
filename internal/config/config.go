@@ -15,6 +15,7 @@ type SOCKS5Config struct {
 type Config struct {
 	Proxy    SOCKS5Config
 	LogLevel string
+	UseTor   bool
 }
 
 var cfg Config
@@ -36,5 +37,11 @@ func init() {
 		cfg.LogLevel = "debug"
 	} else {
 		cfg.LogLevel = "info"
+	}
+
+	if strings.ToLower(os.Getenv("USE_TOR")) == "false" {
+		cfg.UseTor = false
+	} else {
+		cfg.UseTor = true
 	}
 }

@@ -145,16 +145,22 @@ func main() {
 		return
 	}
 
-	logger.Info("connecting to tor",
-		"host", host,
-		"port", port,
-	)
-	client, err := newTorClient(host, port)
-	if err != nil {
-		logger.Error("unable to connect to tor",
-			"error", err.Error(),
+	client := http.DefaultClient
+	var err error
+
+	// overwrite client with tor client
+	if cfg.UseTor {
+		logger.Info("connecting to tor",
+			"host", host,
+			"port", port,
 		)
-		return
+		client, err = newTorClient(host, port)
+		if err != nil {
+			logger.Error("unable to connect to tor",
+				"error", err.Error(),
+			)
+			return
+		}
 	}
 
 	// If the server flag is passed then all other flags are ignored.
