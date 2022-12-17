@@ -2,6 +2,7 @@
 version: 2.1
 jobs:
   build:
+    name: unit_tests
     working_directory: ~/repo
     docker:
       - image: circleci/golang:latest
@@ -10,12 +11,6 @@ jobs:
       - restore_cache:
           keys:
             - go-mod-v4-{{ checksum "go.sum" }}
-
-  test:
-    working_directory: ~/repo
-    docker:
-      - image: circleci/golang:latest
-    steps:
       - run:
           name: Install Dependencies
           command: go mod download
@@ -27,9 +22,3 @@ jobs:
           name: Run tests
           command: |
                   go test ./... -v -cover
-workflows:
-  version: 1
-  build_and_test:
-    jobs:
-      - build
-      - test
