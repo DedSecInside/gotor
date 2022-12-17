@@ -12,6 +12,7 @@ on:
 jobs:
 
   build:
+    name: Go Checks
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
