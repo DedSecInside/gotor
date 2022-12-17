@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/KingAkeem/gotor/internal/logger"
 	"golang.org/x/net/html"
 )
 
@@ -36,6 +37,11 @@ func (n *Node) PrintTree() {
 
 // UpdateStatus gets the current status of the node's URL
 func (n *Node) updateStatus() {
+	logger.Debug("updating status",
+		"url", n.URL,
+		"current status", n.Status,
+		"current status code", n.StatusCode,
+	)
 	if resp, err := n.client.Get(n.URL); err != nil {
 		n.Status = http.StatusText(http.StatusInternalServerError)
 		n.StatusCode = http.StatusInternalServerError
@@ -43,6 +49,11 @@ func (n *Node) updateStatus() {
 		n.Status = http.StatusText(resp.StatusCode)
 		n.StatusCode = resp.StatusCode
 	}
+	logger.Debug("status updated",
+		"url", n.URL,
+		"new status", n.Status,
+		"new status code", n.StatusCode,
+	)
 }
 
 func isValidURL(URL string) bool {
@@ -64,7 +75,12 @@ func NewNode(client *http.Client, URL string) *Node {
 
 // streams start tag tokens found within HTML content at the given link
 func streamTokens(client *http.Client, link string) chan html.Token {
-	tokenStream := make(chan html.Token, 100)
+	TOKEN_CHAN_SIZE := 100
+	logger.Debug("streaming tokens",
+		"link", link,
+		"channel size", TOKEN_CHAN_SIZE,
+	)
+	tokenStream := make(chan html.Token, TOKEN_CHAN_SIZE)
 	go func() {
 		defer close(tokenStream)
 		resp, err := client.Get(link)
@@ -84,6 +100,9 @@ func streamTokens(client *http.Client, link string) chan html.Token {
 				return
 			case html.StartTagToken:
 				token := tokenizer.Token()
+				logger.Debug("queue token stream",
+					"token", token,
+				)
 				tokenStream <- token
 			}
 		}
@@ -93,12 +112,20 @@ func streamTokens(client *http.Client, link string) chan html.Token {
 
 // filters tokens from the stream that do not pass the given tokenfilter
 func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string {
-	filterStream := make(chan string)
+	FILTER_CHAN_SIZE := 10
+	logger.Debug("Filtering tokens",
+		"filter", filter,
+		"channel size", FILTER_CHAN_SIZE,
+	)
+	filterStream := make(chan string, FILTER_CHAN_SIZE)
 
 	filterAttributes := func(token html.Token) {
 		// check if token passes filter
 		for _, attr := range token.Attr {
 			if _, foundAttribute := filter.attributes[attr.Key]; foundAttribute {
+				logger.Debug("queue filter stream",
+					"data", attr.Val,
+				)
 				filterStream <- attr.Val
 			}
 		}
@@ -107,7 +134,13 @@ func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string 
 	go func() {
 		defer close(filterStream)
 		for token := range tokenStream {
+			logger.Debug("dequeue token stream",
+				"token", token,
+			)
 			if len(filter.tags) == 0 {
+				logger.Debug("queue filter stream",
+					"data", token.Data,
+				)
 				filterStream <- token.Data
 			}
 
@@ -117,6 +150,9 @@ func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string 
 				if len(filter.attributes) > 0 {
 					filterAttributes(token)
 				} else {
+					logger.Debug("queue filter stream",
+						"data", token.Data,
+					)
 					filterStream <- token.Data
 				}
 			}
@@ -139,6 +175,11 @@ type TokenFilter struct {
 
 // builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
 func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup, filter *TokenFilter) {
+	logger.Debug("building tree",
+		"parent", parent,
+		"children", childLinks,
+		"filter", filter,
+	)
 	for link := range childLinks {
 		if isValidURL(link) {
 			wg.Add(1)
@@ -162,6 +203,9 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 
 // Load places the tree within memory.
 func (n *Node) Load(depth int) {
+	logger.Debug("attempting to load node",
+		"node", n,
+	)
 	tokenStream := streamTokens(n.client, n.URL)
 	filter := &TokenFilter{
 		tags:       map[string]bool{"a": true},
@@ -173,6 +217,9 @@ func (n *Node) Load(depth int) {
 	wg.Wait()
 	n.loaded = true
 	n.lastLoaded = time.Now().UTC()
+	logger.Debug("loaded node",
+		"node", n,
+	)
 }
 
 // perform work on each token stream until the deapth has been reached
