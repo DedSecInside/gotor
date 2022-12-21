@@ -22,6 +22,9 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 	- Retrieving phone numbers found on websites
 	- Retrieving emails found on websites
 - e.g. `go run src/cmd/main/main.go -server` <- server will start
+- Server can be run using docker 
+e.g. `docker build -t gotor`
+	`docker run -it -p 8010:8010 gotor` <- expoes port 8010
 
 #### Additional
 - `-d` Searching for children nodes of links, defaults to 1

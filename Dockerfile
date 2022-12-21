@@ -29,5 +29,5 @@ COPY src/cmd/ cmd/
 COPY .env .env
 COPY --from=builder "$APP_HOME"/gotor $APP_HOME
 
-EXPOSE 8010
+EXPOSE 8081
 CMD ["./gotor", "-server"]
