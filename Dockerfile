@@ -6,10 +6,15 @@ ENV APP_HOME /go/src/gotor
 
 WORKDIR "$APP_HOME"
 
-COPY src/ .
+# move over source code directories
+COPY api/ api/
+COPY cmd/ cmd/ 
+COPY internal/ internal/
+COPY pkg/ pkg/
+
+# move over necessary files, dependencies and configuration
 COPY go.mod .
 COPY go.sum .
-COPY vendor .
 COPY .env .
 
 RUN go mod download
@@ -22,11 +27,12 @@ ENV APP_HOME /go/src/gotor
 RUN mkdir -p "$APP_HOME"
 WORKDIR "$APP_HOME"
 
-COPY src/api/ api/
-COPY src/pkg/ pkg/
-COPY src/internal/ internal/
-COPY src/cmd/ cmd/
-COPY .env .env
+# move o
+COPY api/ . 
+COPY pkg/ . 
+COPY internal/ . 
+COPY cmd/ cmd/
+COPY .env  .
 COPY --from=builder "$APP_HOME"/gotor $APP_HOME
 
 EXPOSE 8081
