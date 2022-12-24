@@ -27,7 +27,6 @@ ENV APP_HOME /go/src/gotor
 RUN mkdir -p "$APP_HOME"
 WORKDIR "$APP_HOME"
 
-# move o
 COPY api/ . 
 COPY pkg/ . 
 COPY internal/ . 
