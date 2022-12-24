@@ -24,7 +24,9 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 - e.g. `go run cmd/main/main.go -server` 
 
 - Server can be run using docker 
+
 `docker build -t gotor` (build container)
+
 `docker run -it -p 8010:8010 gotor` (expose port 8010)
 
 #### Additional
