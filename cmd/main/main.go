@@ -10,8 +10,7 @@ import (
 	"github.com/KingAkeem/gotor/api"
 	"github.com/KingAkeem/gotor/internal/config"
 	"github.com/KingAkeem/gotor/internal/logger"
-	"github.com/KingAkeem/gotor/pkg/linktree"
-	"github.com/gorilla/mux"
+	"github.com/KingAkeem/gotor/linktree"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 )
@@ -97,26 +96,6 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 	}
 }
 
-func runServer(client *http.Client) {
-	router := mux.NewRouter()
-
-	router.HandleFunc("/ip", api.GetIP(client)).Methods(http.MethodGet)
-	router.HandleFunc("/emails", api.GetEmails(client)).Methods(http.MethodGet)
-	router.HandleFunc("/phone", api.GetPhoneNumbers(client)).Methods(http.MethodGet)
-	router.HandleFunc("/tree", api.GetTreeNode(client)).Methods(http.MethodGet)
-	router.HandleFunc("/content", api.GetWebsiteContent(client)).Methods(http.MethodGet)
-
-	logger.Info("attempting to start local gotor server",
-		"port", "8081",
-	)
-	err := http.ListenAndServe(":8081", router)
-	if err != nil {
-		logger.Fatal("unable to start server",
-			"error", err.Error(),
-		)
-	}
-}
-
 func main() {
 	cfg := config.GetConfig()
 	var root string
@@ -145,7 +124,7 @@ func main() {
 		return
 	}
 
-	client := http.DefaultClient
+	var client *http.Client = http.DefaultClient
 	var err error
 
 	// overwrite client with tor client
@@ -165,7 +144,8 @@ func main() {
 
 	// If the server flag is passed then all other flags are ignored.
 	if serve {
-		runServer(client)
+		serverPort := 8081
+		api.RunServer(client, serverPort)
 		return
 	}
 
