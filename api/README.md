@@ -1,11 +1,11 @@
-# REST HTTP API (Examples are using localhost)
+# REST HTTP API
 
-## Get Link Tree
-### GET `http://localhost:{port}/tree?link=https://example.com&depth=1`
-### Arguments
+### Get Link Tree
+### GET `http://localhost:8081/tree?link=https://example.com&depth=1`
+#### Query Parameters 
 - link (string): the root URL of the tree
 - depth (int): the depth of the tree
-### Response
+#### Response
 ```json
 {
         "url": "https://www.example.com",
@@ -19,30 +19,35 @@
         }]
 }
 ```
+-----
 
-## Get Emails
-### GET `http://localhost:{port}/emails?link=https://random.com`
-### Arguments
+### Get Emails
+### GET `http://localhost:8081/emails?link=https://random.com`
+#### Query Parameters
 - link (string): the root URL of the tree
-### Response
+#### Response
 ```json
 ["random@gmail.com", "random@yahoo.com"]
 ```
 
-## Get Phone Numbers
-### GET `http://localhost:{port}/phone_numbers?link=https://example.com` 
-### Arguments
+-----
+
+### Get Phone Numbers
+### GET `http://localhost:8081/phone_numbers?link=https://example.com` 
+#### Query Parameters 
 - link (string): the root URL of the tree
-### Response
+#### Response
 ```json
 ["+1-234-567-8901", "+1-234-567-8902"]
 ```
 
-## Get current IP of server
+-----
+
+### Get current IP of server
 ### GET `http://localhost:{port}/ip`
-### Arguments
+#### Query parameters 
 N/A
-### Response
+#### Response
 ```json
 "127.0.0.1" (returns IP address as plain string)
 ```

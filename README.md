@@ -39,5 +39,10 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 
 - TOR can be disabled using the `USE_TOR` flag in `.env`
 
+### godoc
+This project has been commented in such a way that `godoc` should produce decent documentation.
+[godoc](https://pkg.go.dev/golang.org/x/tools/cmd/godoc)
+e.g. `godoc -v -http=:6060` will produce documentation at the endpoint `http://127.0.0.1:6060`.
+
 ### How it works
 ![Crawling drawio](https://user-images.githubusercontent.com/13573860/132710986-954b626d-5b42-4fc3-820a-737419690f35.png)

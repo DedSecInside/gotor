@@ -1,3 +1,4 @@
+// This package contains functionality to interact with linktrees
 package linktree
 
 import (
@@ -13,7 +14,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Node represents a single URL
+// Node represents a single node of a LinkTree
 type Node struct {
 	URL        string       `json:"url"`
 	StatusCode int          `json:"status_code"`
@@ -24,7 +25,7 @@ type Node struct {
 	lastLoaded time.Time    `json:"-"`
 }
 
-// PrintTree ...
+// PrintTree prints a visual representation of a tree using the std terminal
 func (n *Node) PrintTree() {
 	fmt.Printf("%s has %d children.\n", n.URL, len(n.Children))
 	for _, child := range n.Children {
@@ -36,24 +37,27 @@ func (n *Node) PrintTree() {
 }
 
 // UpdateStatus gets the current status of the node's URL
-func (n *Node) updateStatus() {
+func (n *Node) updateStatus() error {
 	logger.Debug("updating status",
 		"url", n.URL,
 		"current status", n.Status,
 		"current status code", n.StatusCode,
 	)
-	if resp, err := n.client.Get(n.URL); err != nil {
-		n.Status = http.StatusText(http.StatusInternalServerError)
-		n.StatusCode = http.StatusInternalServerError
-	} else {
-		n.Status = http.StatusText(resp.StatusCode)
-		n.StatusCode = resp.StatusCode
+	resp, err := n.client.Get(n.URL)
+	if err != nil {
+		logger.Warn("unable to get url", "url", n, "error", err)
+		return err
 	}
+
+	n.Status = http.StatusText(resp.StatusCode)
+	n.StatusCode = resp.StatusCode
 	logger.Debug("status updated",
 		"url", n.URL,
 		"new status", n.Status,
 		"new status code", n.StatusCode,
 	)
+
+	return nil
 }
 
 func isValidURL(URL string) bool {
@@ -63,13 +67,19 @@ func isValidURL(URL string) bool {
 	return false
 }
 
-// NewNode returns a new Link object
+// NewNode returns a new node object after setting it's status, this is the primary mode of creating new nodes
 func NewNode(client *http.Client, URL string) *Node {
 	n := &Node{
 		URL:    URL,
 		client: client,
 	}
-	n.updateStatus()
+
+	err := n.updateStatus()
+	if err != nil {
+		n.Status = http.StatusText(http.StatusInternalServerError)
+		n.StatusCode = http.StatusInternalServerError
+	}
+
 	return n
 }
 
@@ -85,7 +95,7 @@ func streamTokens(client *http.Client, link string) chan html.Token {
 		defer close(tokenStream)
 		resp, err := client.Get(link)
 		if err != nil {
-			log.Println(err)
+			logger.Warn("unable to get html to tokenize", "link", link, "error", err)
 			return
 		}
 		tokenizer := html.NewTokenizer(resp.Body)
@@ -110,8 +120,8 @@ func streamTokens(client *http.Client, link string) chan html.Token {
 	return tokenStream
 }
 
-// filters tokens from the stream that do not pass the given tokenfilter
-func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string {
+// filters tokens from the stream that do not pass the given tokenFilter
+func filterTokens(tokenStream chan html.Token, filter *tokenFilter) chan string {
 	FILTER_CHAN_SIZE := 10
 	logger.Debug("Filtering tokens",
 		"filter", filter,
@@ -162,19 +172,19 @@ func filterTokens(tokenStream chan html.Token, filter *TokenFilter) chan string 
 	return filterStream
 }
 
-// TokenFilter determines which tokens will be filtered from a stream,
+// tokenFilter determines which tokens will be filtered from a stream,
 // 1. There are zero to many attributes per tag.
 // if the tag is included then those tags will be used (e.g. all anchor tags)
 // if the attribute is included then those attributes will be used (e.g. all href attributes)
 // if both are specified then the combination will be used (e.g. all href attributes within anchor tags only)
 // if neither is specified then all tokens will be used (e.g. all tags found)
-type TokenFilter struct {
+type tokenFilter struct {
 	tags       map[string]bool
 	attributes map[string]bool
 }
 
 // builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
-func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup, filter *TokenFilter) {
+func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup, filter *tokenFilter) {
 	logger.Debug("building tree",
 		"parent", parent,
 		"children", childLinks,
@@ -201,13 +211,13 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 	}
 }
 
-// Load places the tree within memory.
+// Load constructs a LinkTree using the given depth specified
 func (n *Node) Load(depth int) {
 	logger.Debug("attempting to load node",
 		"node", n,
 	)
 	tokenStream := streamTokens(n.client, n.URL)
-	filter := &TokenFilter{
+	filter := &tokenFilter{
 		tags:       map[string]bool{"a": true},
 		attributes: map[string]bool{"href": true},
 	}
@@ -222,8 +232,8 @@ func (n *Node) Load(depth int) {
 	)
 }
 
-// perform work on each token stream until the deapth has been reached
-func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, depth int, filter *TokenFilter, doWork func(link string)) {
+// perform work on each token stream until the specified depth has been reached
+func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, depth int, filter *tokenFilter, doWork func(link string)) {
 	for link := range linkChan {
 		go func(currentLink string, currentDepth int) {
 			defer wg.Done()
@@ -242,7 +252,7 @@ func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, dept
 // Crawl traverses the children of a node without storing it in memory
 func (n *Node) Crawl(depth int, work func(link string)) {
 	tokenStream := streamTokens(n.client, n.URL)
-	filter := &TokenFilter{
+	filter := &tokenFilter{
 		tags:       map[string]bool{"a": true},
 		attributes: map[string]bool{"href": true},
 	}
