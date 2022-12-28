@@ -27,7 +27,7 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 
 `docker build -t gotor` (build container)
 
-`docker run -it -p 8010:8010 gotor` (expose port 8010)
+`docker run -it -p 8081:8081 gotor` (expose port 8081)
 
 #### Additional
 - `-d` Searching for children nodes of links, defaults to 1
