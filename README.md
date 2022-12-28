@@ -14,7 +14,7 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 - `-h` SOCKS5 proxy host, defaults to localhost (127.0.0.1)
 - `-p` SOCKS5 proxy port, defaults to 9050
 
-#### REST
+#### REST (Ran on localhost:8081 by default)
 - `-server` Starts HTTP server that provides a REST API to the crawling mechanisms
 - Current crawling mechanisms include: 
 	- Building relationship tree of links where children nodes represents links that can be found on a website
