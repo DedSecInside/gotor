@@ -34,11 +34,14 @@ if [[ -n $GOTOR_IMAGE ]]; then
 	docker rmi  gotor
 fi
 
-# Restart tor if necessary
-if [[ -n $USE_TOR && $USE_TOR = "true" ]]; then
+TOR_NETWORK=$(docker network ls | grep tor)
+if [[ -n $TOR_NETWORK ]]; then
 	echo "Removing docker tor network"
 	docker network remove tor
+fi
 
+# Restart tor if necessary
+if [[ -n $USE_TOR && $USE_TOR = "true" ]]; then
 	echo "Pulling and creating tor network"
 	docker pull dperson/torproxy
 	docker network create tor 
