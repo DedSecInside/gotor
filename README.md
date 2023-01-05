@@ -14,7 +14,7 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 - `-h` SOCKS5 proxy host, defaults to localhost (127.0.0.1)
 - `-p` SOCKS5 proxy port, defaults to 9050
 
-#### REST
+#### REST (Ran on localhost:8081 by default)
 - `-server` Starts HTTP server that provides a REST API to the crawling mechanisms
 - Current crawling mechanisms include: 
 	- Building relationship tree of links where children nodes represents links that can be found on a website
@@ -26,7 +26,6 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 - The server can be run using the `run.sh` command which will build a docker network service for tor and connect it to the gotor docker container.
 In order to avoid conflicts, ensure that no other service is running on the same port. It will use the SOCKS5_PORT
 e.g. `./run.sh` (within the home directory)
-
 You can deconstruct the containers using the `destroy.sh` command
 
 #### Additional
