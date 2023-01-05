@@ -18,9 +18,11 @@ if [[ -n $USE_TOR && $USE_TOR = "true" ]]; then
 
 	echo "Starting dperson/torproxy container"
 	docker run -d --rm -it --name tor_service --network tor -p$SOCKS5_PORT:$SOCKS5_PORT dperson/torproxy 
+	printf "\ntor proxy started on port :$SOCKS5_PORT\n\n"
 fi
 
 # Start main server
 echo "Building and starting gotor container"
 docker build -t gotor .
 docker run -d --rm -it --network tor -p8081:8081 gotor
+printf "\ngotor container started on port :8081\n\n"
