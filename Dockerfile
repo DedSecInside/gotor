@@ -8,9 +8,9 @@ WORKDIR "$APP_HOME"
 
 # move over source code directories
 COPY api/ api/
-COPY cmd/ cmd/ 
+COPY cmd/ cmd/
 COPY internal/ internal/
-COPY pkg/ pkg/
+COPY linktree/ linktree/
 
 # move over necessary files, dependencies and configuration
 COPY go.mod .
@@ -27,11 +27,12 @@ ENV APP_HOME /go/src/gotor
 RUN mkdir -p "$APP_HOME"
 WORKDIR "$APP_HOME"
 
-COPY api/ . 
-COPY pkg/ . 
-COPY internal/ . 
+COPY api/ .
+COPY linktree/ .
+COPY internal/ .
 COPY cmd/ cmd/
 COPY .env  .
+
 COPY --from=builder "$APP_HOME"/gotor $APP_HOME
 
 EXPOSE 8081
