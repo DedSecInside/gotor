@@ -23,9 +23,9 @@ The program is meant to be used in tandem with [TorBot](https://github.com/DedSe
 	- Retrieving emails found on websites
 - e.g. `go run cmd/main/main.go -server` 
 
-- The server can be run using the `run.sh` command which will build a docker network service for tor and connect it to the gotor docker container.
+- The server can be run using the `build.sh` command which will build a docker network service for tor and connect it to the gotor docker container.
 In order to avoid conflicts, ensure that no other service is running on the same port. It will use the SOCKS5_PORT
-e.g. `./run.sh` (within the home directory)
+e.g. `./build.sh` (within the home directory)
 You can deconstruct the containers using the `destroy.sh` command
 
 #### Additional
