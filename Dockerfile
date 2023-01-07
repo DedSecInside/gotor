@@ -15,7 +15,7 @@ COPY linktree/ linktree/
 # move over necessary files, dependencies and configuration
 COPY go.mod .
 COPY go.sum .
-COPY .env .
+COPY docker.env .
 
 RUN go mod download
 RUN go mod verify
@@ -31,7 +31,7 @@ COPY api/ .
 COPY linktree/ .
 COPY internal/ .
 COPY cmd/ cmd/
-COPY .env  .
+COPY docker.env  .env
 
 COPY --from=builder "$APP_HOME"/gotor $APP_HOME
 

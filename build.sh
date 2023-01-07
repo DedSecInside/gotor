@@ -14,10 +14,10 @@ fi
 if [[ -n $USE_TOR && $USE_TOR = "true" ]]; then
 	echo "Pulling and creating tor network"
 	docker pull dperson/torproxy
-	docker network create tor 
+	docker network create tor
 
 	echo "Starting dperson/torproxy container"
-	docker run -d --rm -it --name tor_service --network tor -p$SOCKS5_PORT:$SOCKS5_PORT dperson/torproxy 
+	docker run -d --rm -it --name tor_service --network tor -p$SOCKS5_PORT:$SOCKS5_PORT dperson/torproxy
 	printf "\ntor proxy started on port :$SOCKS5_PORT\n\n"
 fi
 
