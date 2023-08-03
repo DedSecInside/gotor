@@ -8,14 +8,14 @@
 This is an HTTP REST API and command line program to gather and analyze data using web-crawling via TOR.
 The program is meant to be used in tandem with [TorBot](https://github.com/DedSecInside/TorBot), but the API and CLI can be run separately.
 
-### CLI Flags
+### Options
 
-#### TOR (can also be set from `.env` to retain settings, CLI flags will override environment variables at runtime)
+#### Tor (can also be set from `.env` to retain settings, CLI flags will override environment variables at runtime)
 - `-h` SOCKS5 proxy host, defaults to localhost (127.0.0.1)
 - `-p` SOCKS5 proxy port, defaults to 9050
 
-#### REST (Ran on localhost:8081 by default)
-- `-server` Starts HTTP server that provides a REST API to the crawling mechanisms
+#### REST API (Ran on http://localhost:8081 by default)
+- `-server` Starts HTTP server
 - Current crawling mechanisms include: 
 	- Building relationship tree of links where children nodes represents links that can be found on a website
 	- Getting the IP of the current Tor client
@@ -42,6 +42,3 @@ You can deconstruct the containers using the `destroy.sh` command
 This project has been commented in such a way that `godoc` should produce decent documentation.
 [godoc](https://pkg.go.dev/golang.org/x/tools/cmd/godoc)
 e.g. `godoc -v -http=:6060` will produce documentation at the endpoint `http://127.0.0.1:6060`.
-
-### How it works
-![Crawling drawio](https://user-images.githubusercontent.com/13573860/132710986-954b626d-5b42-4fc3-820a-737419690f35.png)
