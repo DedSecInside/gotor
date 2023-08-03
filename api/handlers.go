@@ -226,6 +226,7 @@ func getTorIP() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
 	tokenizer := html.NewTokenizer(resp.Body)
 	for {

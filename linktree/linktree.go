@@ -48,6 +48,7 @@ func (n *Node) updateStatus() error {
 		logger.Warn("unable to get url", "url", n, "error", err)
 		return err
 	}
+	defer resp.Body.Close()
 
 	n.Status = http.StatusText(resp.StatusCode)
 	n.StatusCode = resp.StatusCode
@@ -98,6 +99,8 @@ func streamTokens(client *http.Client, link string) chan html.Token {
 			logger.Warn("unable to get html to tokenize", "link", link, "error", err)
 			return
 		}
+		defer resp.Body.Close()
+
 		tokenizer := html.NewTokenizer(resp.Body)
 		for {
 			tokenType := tokenizer.Next()
