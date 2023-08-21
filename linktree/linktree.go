@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/KingAkeem/gotor/internal/logger"
+	"github.com/DedSecInside/gotor/internal/logger"
 	"golang.org/x/net/html"
 )
 

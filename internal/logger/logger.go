@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"github.com/KingAkeem/gotor/internal/config"
+	"github.com/DedSecInside/gotor/internal/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

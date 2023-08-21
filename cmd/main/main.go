@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/KingAkeem/gotor/api"
-	"github.com/KingAkeem/gotor/internal/config"
-	"github.com/KingAkeem/gotor/internal/logger"
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/DedSecInside/gotor/api"
+	"github.com/DedSecInside/gotor/internal/config"
+	"github.com/DedSecInside/gotor/internal/logger"
+	"github.com/DedSecInside/gotor/linktree"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 )

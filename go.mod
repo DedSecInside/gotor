@@ -1,4 +1,4 @@
-module github.com/KingAkeem/gotor
+module github.com/DedSecInside/gotor
 
 go 1.16
 

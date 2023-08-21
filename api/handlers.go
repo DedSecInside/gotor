@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/KingAkeem/gotor/internal/logger"
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/DedSecInside/gotor/internal/logger"
+	"github.com/DedSecInside/gotor/linktree"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/html"
 )

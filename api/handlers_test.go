@@ -6,7 +6,7 @@ import (
 
 	"net/http"
 
-	"github.com/KingAkeem/gotor/linktree"
+	"github.com/DedSecInside/gotor/linktree"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 )
