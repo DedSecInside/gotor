@@ -34,8 +34,17 @@ func init() {
 		return
 	}
 
-	cfg.Proxy.Host = os.Getenv("SOCKS5_HOST")
-	cfg.Proxy.Port = os.Getenv("SOCKS5_PORT")
+	host := os.Getenv("SOCKS5_HOST")
+	if host != "" {
+		host = "localhost"
+	}
+	cfg.Proxy.Host = host
+
+	port := os.Getenv("SOCKS5_PORT")
+	if port != "" {
+		port = "9050"
+	}
+	cfg.Proxy.Port = port
 
 	if strings.ToLower(os.Getenv("DEBUG")) == "true" {
 		cfg.LogLevel = "debug"
