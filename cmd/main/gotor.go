@@ -97,7 +97,6 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 }
 
 func main() {
-	cfg := config.GetConfig()
 	var root string
 	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
 
@@ -105,10 +104,10 @@ func main() {
 	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
 
 	var host string
-	flag.StringVar(&host, "h", cfg.Proxy.Host, "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+	flag.StringVar(&host, "h", "localhost", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
 
 	var port string
-	flag.StringVar(&port, "p", cfg.Proxy.Port, "The port used for the SOCKS5 proxy. Defaults to 9050.")
+	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
 
 	var output string
 	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal. Options are terminal, excel sheet (using xlsx) or tree (a tree representation will be visually printed in text)")
@@ -117,6 +116,10 @@ func main() {
 	flag.BoolVar(&serve, "server", false, "Determines if the program will behave as an HTTP server.")
 
 	flag.Parse()
+
+	cfg := config.GetConfig()
+	cfg.Proxy.Host = host
+	cfg.Proxy.Port = port
 
 	// If not serving and not root is passed, there's nothing to do
 	if !serve && root == "" {
