@@ -13,8 +13,8 @@ This repository contains an HTTP REST API and a command-line program designed fo
 ### TOR Integration
 The program employs the TOR network for enhanced privacy and security during web crawling. TOR settings can be configured using environment variables or overridden using CLI flags.
 
-* -h: Specify the SOCKS5 proxy host (default: localhost / 127.0.0.1)
-* -p: Specify the SOCKS5 proxy port (default: 9050)
+* `-h`: Specify the SOCKS5 proxy host (default: localhost / 127.0.0.1)
+* `-p`: Specify the SOCKS5 proxy port (default: 9050)
 
 ### REST API
 The REST API is accessible by default at http://localhost:8081 and provides the following endpoint, check the `api` directory for endpoint documentation.
@@ -50,9 +50,9 @@ Make sure no other service is using the same port. The script uses the SOCKS5_PO
 ```
 
 ### Additional Configuration
-* -l: the URL to use if searching directly
-* -d: Specify the depth for searching children nodes of links (default: 1)
-* -o: Set the output destination for results. Supported formats include:
+* `-l`: the URL to use if searching directly
+* `-d`: Specify the depth for searching children nodes of links (default: 1)
+* `-o`: Set the output destination for results. Supported formats include:
 	* terminal (outputs the tree structure directly to the terminal)
 	* excel (saves results to a .xlsx file in the current directory)
 	* json (saves results to a .json file in the current directory)
