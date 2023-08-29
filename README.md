@@ -20,15 +20,20 @@ The program employs the TOR network for enhanced privacy and security during web
 The REST API is accessible by default at http://localhost:8081 and provides the following endpoint, check the `api` directory for endpoint documentation.
   
 ### Available Crawling Mechanisms
-1. Building Relationship Tree of Links: Generates a hierarchical tree of links, with child nodes representing links found on a website.
-2. Getting Tor Client IP: Retrieves the IP address of the current TOR client.
-3. Retrieving Phone Numbers: Collects phone numbers found on websites.
-4. Retrieving Emails: Gathers email addresses found on websites.
+1. **Building Relationship Tree of Links**: Generates a hierarchical tree of links, with child nodes representing links found on a website.
+2. **Getting Tor Client IP**: Retrieves the IP address of the current TOR client.
+3. **Retrieving Phone Numbers**: Collects phone numbers found on websites.
+4. **Retrieving Emails**: Gathers email addresses found on websites.
 
 #### Example Usage
 To start the HTTP server and initiate crawling, use the following command:
 ```bash
 go run cmd/main/main.go -server
+```
+
+w/ alternate host and port:
+```bash
+go run cmd/main/main.go -server -h localhost -p 9051
 ```
 
 To crawl directly using the CLI and output the results to an Excel file, use the following command:
