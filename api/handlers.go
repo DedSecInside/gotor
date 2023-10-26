@@ -22,7 +22,7 @@ import (
 var client = http.DefaultClient
 
 // RunServer starts the server for the API, using the given client and port. Pass `nil` to use the default client, port must be specified
-func RunServer(overrideClient *http.Client, port int) {
+func RunServer(overrideClient *http.Client, host string, port int) {
 	router := mux.NewRouter()
 
 	if overrideClient != nil {
@@ -36,9 +36,12 @@ func RunServer(overrideClient *http.Client, port int) {
 	router.HandleFunc("/content", GetWebsiteContent).Methods(http.MethodGet)
 
 	logger.Info("attempting to start local gotor server",
+		"host", host,
 		"port", port,
 	)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
+
+	address := fmt.Sprintf("%s:%d", host, port)
+	err := http.ListenAndServe(address, router)
 	if err != nil {
 		logger.Fatal("unable to start server",
 			"error", err.Error(),

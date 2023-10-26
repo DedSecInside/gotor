@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"github.com/DedSecInside/gotor/api"
-	"github.com/DedSecInside/gotor/internal/config"
 	"github.com/DedSecInside/gotor/internal/logger"
 	"github.com/DedSecInside/gotor/linktree"
 	"github.com/mgutz/ansi"
@@ -16,8 +14,8 @@ import (
 )
 
 // creates a http client using socks5 proxy
-func newTorClient(host, port string) (*http.Client, error) {
-	proxyStr := fmt.Sprintf("socks5://%s:%s", host, port)
+func newTorClient(host string, port int) (*http.Client, error) {
+	proxyStr := fmt.Sprintf("socks5://%s:%d", host, port)
 	proxyURL, err := url.Parse(proxyStr)
 	if err != nil {
 		return nil, err
@@ -35,7 +33,7 @@ func writeTree(node *linktree.Node, depth int) {
 	node.PrintTree()
 }
 
-func writeTerminal(client *http.Client, node *linktree.Node, depth int) {
+func writeList(client *http.Client, node *linktree.Node, depth int) {
 	printStatus := func(link string) {
 		n := linktree.NewNode(client, link)
 		markError := ansi.ColorFunc("red")
@@ -49,7 +47,7 @@ func writeTerminal(client *http.Client, node *linktree.Node, depth int) {
 	node.Crawl(depth, printStatus)
 }
 
-func writeExcel(client *http.Client, node *linktree.Node, depth int) {
+func downloadExcel(client *http.Client, node *linktree.Node, depth int) {
 	f := excelize.NewFile()
 	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
 	if err != nil {
@@ -97,32 +95,25 @@ func writeExcel(client *http.Client, node *linktree.Node, depth int) {
 }
 
 func main() {
-	var root string
-	flag.StringVar(&root, "l", "", "Root used for searching. Required. (Must be a valid URL)")
+	url := flag.String("url", "", "URL used to initiate search. Root of the LinkTree. Required ")
+	depth := flag.Int("depth", 1, "Depth of search. Defaults to 1.")
 
-	var depthInput string
-	flag.StringVar(&depthInput, "d", "1", "Depth of search. Defaults to 1. (Must be an integer)")
+	// socks6 configuration
+	socks5Host := flag.String("socks5-host", "127.0.0.1", "Host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+	socks5Port := flag.Int("socks5-port", 9050, "Port used for the SOCKS5 proxy. Defaults to 9050.")
 
-	var host string
-	flag.StringVar(&host, "h", "localhost", "The host used for the SOCKS5 proxy. Defaults to localhost (127.0.0.1.)")
+	// server configuraiton
+	serverHost := flag.String("server-host", "127.0.0.1", "Host used for the GoTor server. Defaults to localhost (127.0.0.1.)")
+	serverPort := flag.Int("server-port", 8081, "Port used for the GoTor server. Defaults to 8081")
 
-	var port string
-	flag.StringVar(&port, "p", "9050", "The port used for the SOCKS5 proxy. Defaults to 9050.")
-
-	var output string
-	flag.StringVar(&output, "o", "terminal", "The method of output being used. Defaults to terminal. Options are terminal, excel sheet (using xlsx) or tree (a tree representation will be visually printed in text)")
-
-	var serve bool
-	flag.BoolVar(&serve, "server", false, "Determines if the program will behave as an HTTP server.")
-
+	outputFmt := flag.String("f", "list", "Determines how results will be printed. Options are list or tree")
+	download := flag.Bool("d", false, "Downloads results as Excel spreadsheet. (.xlsx)")
+	serve := flag.Bool("s", false, "Determines if the program will behave as an HTTP server.")
+	disableTor := flag.Bool("disable-socks5", false, "Disable the use of SOCKS5 proxy.")
 	flag.Parse()
 
-	cfg := config.GetConfig()
-	cfg.Proxy.Host = host
-	cfg.Proxy.Port = port
-
-	// If not serving and not root is passed, there's nothing to do
-	if !serve && root == "" {
+	// If not serving and no URL is passed, there's nothing to do
+	if !*serve && *url == "" {
 		flag.CommandLine.Usage()
 		return
 	}
@@ -131,12 +122,12 @@ func main() {
 	var err error
 
 	// overwrite client with tor client
-	if cfg.UseTor {
+	if !*disableTor {
 		logger.Info("connecting to tor",
-			"host", host,
-			"port", port,
+			"host", socks5Host,
+			"port", socks5Port,
 		)
-		client, err = newTorClient(host, port)
+		client, err = newTorClient(*socks5Host, *socks5Port)
 		if err != nil {
 			logger.Error("unable to connect to tor",
 				"error", err.Error(),
@@ -146,30 +137,26 @@ func main() {
 	}
 
 	// If the server flag is passed then all other flags are ignored.
-	if serve {
-		serverPort := 8081
-		api.RunServer(client, serverPort)
-		return
-	}
-
-	depth, err := strconv.Atoi(depthInput)
-	if err != nil {
-		flag.CommandLine.Usage()
+	if *serve {
+		api.RunServer(client, *serverHost, *serverPort)
 		return
 	}
 
 	logger.Info("starting tree with root",
-		"root", root,
-		"depth", depth,
-		"output", output,
+		"root", *url,
+		"depth", *depth,
+		"output", *outputFmt,
 	)
-	node := linktree.NewNode(client, root)
-	switch output {
-	case "terminal":
-		writeTerminal(client, node, depth)
-	case "excel":
-		writeExcel(client, node, depth)
+
+	node := linktree.NewNode(client, *url)
+	switch *outputFmt {
+	case "list":
+		writeList(client, node, *depth)
 	case "tree":
-		writeTree(node, depth)
+		writeTree(node, *depth)
+	}
+
+	if *download {
+		downloadExcel(client, node, *depth)
 	}
 }

@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"github.com/DedSecInside/gotor/internal/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -9,11 +8,7 @@ import (
 var zapper *zap.Logger
 
 func init() {
-
 	logCfg := zap.NewProductionConfig()
-	if config.GetConfig().LogLevel == "debug" {
-		logCfg.Level.SetLevel(zap.DebugLevel)
-	}
 	logCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	zapper = zap.Must(logCfg.Build())
 }
