@@ -3,9 +3,9 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
-	"github.com/DedSecInside/gotor/internal/logger"
 	"github.com/gorilla/mux"
 )
 
@@ -33,16 +33,12 @@ func (s Server) Run() {
 	router.HandleFunc("/phone", s.handleGetPhoneNumbers).Methods(http.MethodGet)
 	router.HandleFunc("/content", s.handleGetWebsiteContent).Methods(http.MethodGet)
 
-	logger.Info("attempting to start local gotor server",
-		"host", s.host,
-		"port", s.port,
-	)
+	log.Printf("Attempting to start local gotor server. Host: %s - Port: %d\n", s.host, s.port)
 
 	address := fmt.Sprintf("%s:%d", s.host, s.port)
 	err := http.ListenAndServe(address, router)
 	if err != nil {
-		logger.Fatal("unable to start server",
-			"error", err.Error(),
-		)
+		log.Fatalf("Unable to start server. Error: %+v.\n", err)
+		return
 	}
 }

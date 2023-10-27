@@ -2,12 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"github.com/DedSecInside/gotor/internal/logger"
 	"github.com/DedSecInside/gotor/pkg/linktree"
 )
 
@@ -48,19 +48,10 @@ func collectEmails(client *http.Client, link string) []string {
 // GetEmails writes an array of emails found on the given "link" passed in the query parameters by the client
 func (s Server) handleGetEmails(w http.ResponseWriter, r *http.Request) {
 	link := r.URL.Query().Get("link")
-	logger.Info("attempting to collect emails",
-		"link", link,
-	)
 	emails := collectEmails(s.client, link)
-	logger.Info("emails collected",
-		"link", link,
-		"emails", emails,
-	)
 	err := json.NewEncoder(w).Encode(emails)
 	if err != nil {
-		logger.Error("unable to marshal",
-			"error", err,
-		)
+		log.Printf("Unable to marshal. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

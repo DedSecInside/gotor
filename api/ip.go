@@ -2,9 +2,9 @@ package api
 
 import (
 	"io"
+	"log"
 	"net/http"
 
-	"github.com/DedSecInside/gotor/internal/logger"
 	"golang.org/x/net/html"
 )
 
@@ -39,23 +39,17 @@ func getTorIP(client *http.Client) (string, error) {
 
 // GetIP writes the IP address of the current TOR connection being used
 func (s Server) handleGetIP(w http.ResponseWriter, r *http.Request) {
-	logger.Info("retrieving local tor IP")
 	ip, err := getTorIP(s.client)
 	if err != nil {
-		logger.Error("unable to retrieve IP",
-			"error", err,
-		)
+		log.Printf("Unable to retrieve IP. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	_, err = w.Write([]byte(ip))
 	if err != nil {
-		logger.Error("unable to write IP",
-			"error", err,
-		)
+		log.Printf("Unable to write IP. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	logger.Info("Successfully sent IP", "ip", ip)
 }
