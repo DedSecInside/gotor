@@ -3,15 +3,14 @@ package linktree
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/DedSecInside/gotor/internal/logger"
-	"golang.org/x/net/html"
+	"github.com/mgutz/ansi"
+	"github.com/xuri/excelize/v2"
 )
 
 // Node represents a single node of a LinkTree
@@ -25,6 +24,53 @@ type Node struct {
 	lastLoaded time.Time    `json:"-"`
 }
 
+func (n *Node) DownloadExcel(depth int) {
+	f := excelize.NewFile()
+	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
+	if err != nil {
+		logger.Fatal("unable to set sheet name", "error", err)
+	}
+
+	err = f.SetCellStr(f.GetSheetName(0), "B1", "Status")
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
+
+	row := 2
+	addRow := func(link string) {
+		node := NewNode(n.client, link)
+		linkCell := fmt.Sprintf("A%d", row)
+		statusCell := fmt.Sprintf("B%d", row)
+		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
+
+		err = f.SetCellStr(f.GetSheetName(0), statusCell, fmt.Sprintf("%d %s", node.StatusCode, node.Status))
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
+		row++
+	}
+	n.Crawl(depth, addRow)
+	u, err := url.Parse(n.URL)
+	if err != nil {
+		logger.Fatal("unable to parse node URL",
+			"url", n.URL,
+			"error", err.Error(),
+		)
+	}
+
+	filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
+	err = f.SaveAs(filename)
+	if err != nil {
+		logger.Fatal("unable to save excel file",
+			"filename", filename,
+			"error", err.Error(),
+		)
+	}
+}
+
 // PrintTree prints a visual representation of a tree using the std terminal
 func (n *Node) PrintTree() {
 	fmt.Printf("%s has %d children.\n", n.URL, len(n.Children))
@@ -34,6 +80,20 @@ func (n *Node) PrintTree() {
 	for _, child := range n.Children {
 		child.PrintTree()
 	}
+}
+
+func (n *Node) PrintList(depth int) {
+	printStatus := func(link string) {
+		n := NewNode(n.client, link)
+		markError := ansi.ColorFunc("red")
+		markSuccess := ansi.ColorFunc("green")
+		if n.StatusCode != 200 {
+			fmt.Printf("Link: %20s Status: %d %s\n", n.URL, n.StatusCode, markError(n.Status))
+		} else {
+			fmt.Printf("Link: %20s Status: %d %s\n", n.URL, n.StatusCode, markSuccess(n.Status))
+		}
+	}
+	n.Crawl(depth, printStatus)
 }
 
 // UpdateStatus gets the current status of the node's URL
@@ -82,108 +142,6 @@ func NewNode(client *http.Client, URL string) *Node {
 	}
 
 	return n
-}
-
-// streams start tag tokens found within HTML content at the given link
-func streamTokens(client *http.Client, link string) chan html.Token {
-	TOKEN_CHAN_SIZE := 100
-	logger.Debug("streaming tokens",
-		"link", link,
-		"channel size", TOKEN_CHAN_SIZE,
-	)
-	tokenStream := make(chan html.Token, TOKEN_CHAN_SIZE)
-	go func() {
-		defer close(tokenStream)
-		resp, err := client.Get(link)
-		if err != nil {
-			logger.Warn("unable to get html to tokenize", "link", link, "error", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		tokenizer := html.NewTokenizer(resp.Body)
-		for {
-			tokenType := tokenizer.Next()
-			switch tokenType {
-			case html.ErrorToken:
-				err := tokenizer.Err()
-				if err != io.EOF {
-					log.Println(err)
-				}
-				return
-			case html.StartTagToken:
-				token := tokenizer.Token()
-				logger.Debug("queue token stream",
-					"token", token,
-				)
-				tokenStream <- token
-			}
-		}
-	}()
-	return tokenStream
-}
-
-// filters tokens from the stream that do not pass the given tokenFilter
-func filterTokens(tokenStream chan html.Token, filter *tokenFilter) chan string {
-	FILTER_CHAN_SIZE := 10
-	logger.Debug("Filtering tokens",
-		"filter", filter,
-		"channel size", FILTER_CHAN_SIZE,
-	)
-	filterStream := make(chan string, FILTER_CHAN_SIZE)
-
-	filterAttributes := func(token html.Token) {
-		// check if token passes filter
-		for _, attr := range token.Attr {
-			if _, foundAttribute := filter.attributes[attr.Key]; foundAttribute {
-				logger.Debug("queue filter stream",
-					"data", attr.Val,
-				)
-				filterStream <- attr.Val
-			}
-		}
-	}
-
-	go func() {
-		defer close(filterStream)
-		for token := range tokenStream {
-			logger.Debug("dequeue token stream",
-				"token", token,
-			)
-			if len(filter.tags) == 0 {
-				logger.Debug("queue filter stream",
-					"data", token.Data,
-				)
-				filterStream <- token.Data
-			}
-
-			// check if token passes tag filter or tag filter is empty
-			if _, foundTag := filter.tags[token.Data]; foundTag {
-				// emit attributes if there is a filter, otherwise emit token
-				if len(filter.attributes) > 0 {
-					filterAttributes(token)
-				} else {
-					logger.Debug("queue filter stream",
-						"data", token.Data,
-					)
-					filterStream <- token.Data
-				}
-			}
-		}
-	}()
-
-	return filterStream
-}
-
-// tokenFilter determines which tokens will be filtered from a stream,
-// 1. There are zero to many attributes per tag.
-// if the tag is included then those tags will be used (e.g. all anchor tags)
-// if the attribute is included then those attributes will be used (e.g. all href attributes)
-// if both are specified then the combination will be used (e.g. all href attributes within anchor tags only)
-// if neither is specified then all tokens will be used (e.g. all tags found)
-type tokenFilter struct {
-	tags       map[string]bool
-	attributes map[string]bool
 }
 
 // builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
@@ -254,6 +212,7 @@ func crawl(client *http.Client, wg *sync.WaitGroup, linkChan <-chan string, dept
 
 // Crawl traverses the children of a node without storing it in memory
 func (n *Node) Crawl(depth int, work func(link string)) {
+	fmt.Println(n.client, n.URL)
 	tokenStream := streamTokens(n.client, n.URL)
 	filter := &tokenFilter{
 		tags:       map[string]bool{"a": true},
@@ -263,4 +222,5 @@ func (n *Node) Crawl(depth int, work func(link string)) {
 	wg := new(sync.WaitGroup)
 	crawl(n.client, wg, filteredStream, depth, filter, work)
 	wg.Wait()
+	fmt.Println("something")
 }
