@@ -3,12 +3,12 @@ package linktree
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
-	"github.com/DedSecInside/gotor/internal/logger"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 )
@@ -28,14 +28,17 @@ func (n *Node) DownloadExcel(depth int) {
 	f := excelize.NewFile()
 	err := f.SetCellStr(f.GetSheetName(0), "A1", "Link")
 	if err != nil {
-		logger.Fatal("unable to set sheet name", "error", err)
+		log.Fatalf("Unable to set Link title. Error %+v\n", err)
+		return
 	}
 
 	err = f.SetCellStr(f.GetSheetName(0), "B1", "Status")
 	if err != nil {
-		logger.Fatal(err.Error())
+		log.Fatalf("Unable to set Status title. Error: %+v\n", err)
+		return
 	}
 
+	// start at second row and begin writing data
 	row := 2
 	addRow := func(link string) {
 		node := NewNode(n.client, link)
@@ -43,31 +46,30 @@ func (n *Node) DownloadExcel(depth int) {
 		statusCell := fmt.Sprintf("B%d", row)
 		err = f.SetCellStr(f.GetSheetName(0), linkCell, node.URL)
 		if err != nil {
-			logger.Fatal(err.Error())
+			log.Fatalf("Unable to set cell. Link %s. Error: %+v\n", node.URL, err)
+			return
 		}
 
 		err = f.SetCellStr(f.GetSheetName(0), statusCell, fmt.Sprintf("%d %s", node.StatusCode, node.Status))
 		if err != nil {
-			logger.Fatal(err.Error())
+			log.Fatalf("Unable to set cell. Status %s. Error: %v\n", node.Status, err)
+			return
 		}
 		row++
 	}
+
 	n.Crawl(depth, addRow)
 	u, err := url.Parse(n.URL)
 	if err != nil {
-		logger.Fatal("unable to parse node URL",
-			"url", n.URL,
-			"error", err.Error(),
-		)
+		log.Fatalf("Unable to parse node URL. URL %s. Error: %+v\n", n.URL, err)
+		return
 	}
 
 	filename := fmt.Sprintf("%s_depth_%d.xlsx", u.Hostname(), depth)
 	err = f.SaveAs(filename)
 	if err != nil {
-		logger.Fatal("unable to save excel file",
-			"filename", filename,
-			"error", err.Error(),
-		)
+		log.Fatalf("Unable to save Excel file. Filename %s. Error: %+v\n", filename, err)
+		return
 	}
 }
 
@@ -98,26 +100,16 @@ func (n *Node) PrintList(depth int) {
 
 // UpdateStatus gets the current status of the node's URL
 func (n *Node) updateStatus() error {
-	logger.Debug("updating status",
-		"url", n.URL,
-		"current status", n.Status,
-		"current status code", n.StatusCode,
-	)
 	resp, err := n.client.Get(n.URL)
 	if err != nil {
-		logger.Warn("unable to get url", "url", n, "error", err)
+		log.Printf("Unable to GET URL. URL %s. Error: %+v\n", n.URL, err)
 		return err
 	}
+
 	defer resp.Body.Close()
 
 	n.Status = http.StatusText(resp.StatusCode)
 	n.StatusCode = resp.StatusCode
-	logger.Debug("status updated",
-		"url", n.URL,
-		"new status", n.Status,
-		"new status code", n.StatusCode,
-	)
-
 	return nil
 }
 
@@ -146,11 +138,6 @@ func NewNode(client *http.Client, URL string) *Node {
 
 // builds a tree for the parent node using the incoming links as children (repeated until depth has been exhausted)
 func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGroup, filter *tokenFilter) {
-	logger.Debug("building tree",
-		"parent", parent,
-		"children", childLinks,
-		"filter", filter,
-	)
 	for link := range childLinks {
 		if isValidURL(link) {
 			wg.Add(1)
@@ -174,9 +161,6 @@ func buildTree(parent *Node, depth int, childLinks chan string, wg *sync.WaitGro
 
 // Load constructs a LinkTree using the given depth specified
 func (n *Node) Load(depth int) {
-	logger.Debug("attempting to load node",
-		"node", n,
-	)
 	tokenStream := streamTokens(n.client, n.URL)
 	filter := &tokenFilter{
 		tags:       map[string]bool{"a": true},
@@ -188,9 +172,6 @@ func (n *Node) Load(depth int) {
 	wg.Wait()
 	n.loaded = true
 	n.lastLoaded = time.Now().UTC()
-	logger.Debug("loaded node",
-		"node", n,
-	)
 }
 
 // perform work on each token stream until the specified depth has been reached

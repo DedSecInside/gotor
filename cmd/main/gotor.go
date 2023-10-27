@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/DedSecInside/gotor/api"
-	"github.com/DedSecInside/gotor/internal/logger"
 	"github.com/DedSecInside/gotor/pkg/linktree"
 )
 
@@ -49,21 +49,16 @@ func main() {
 		flag.CommandLine.Usage()
 		return
 	}
-
 	var client *http.Client = http.DefaultClient
 	var err error
 
 	// overwrite client with tor client
 	if !*disableTor {
-		logger.Info("connecting to tor",
-			"host", socks5Host,
-			"port", socks5Port,
-		)
+		log.Println("Creating Tor client...")
+		log.Printf("SOCKS5 Proxy Address: %s:%d\n", *socks5Host, *socks5Port)
 		client, err = newTorClient(*socks5Host, *socks5Port)
 		if err != nil {
-			logger.Error("unable to connect to tor",
-				"error", err.Error(),
-			)
+			log.Fatalf("Unable to connect Tor. Error: %+v\n", err)
 			return
 		}
 	}
@@ -75,12 +70,7 @@ func main() {
 		return
 	}
 
-	logger.Info("starting tree with root",
-		"root", *url,
-		"depth", *depth,
-		"output", *outputFmt,
-	)
-
+	log.Printf("Building tree - Root: %s Depth %d Format %s\n", *url, *depth, *outputFmt)
 	node := linktree.NewNode(client, *url)
 	switch *outputFmt {
 	case "list":
