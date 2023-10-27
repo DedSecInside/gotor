@@ -6,7 +6,7 @@ import (
 
 	"net/http"
 
-	"github.com/DedSecInside/gotor/linktree"
+	"github.com/DedSecInside/gotor/pkg/linktree"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,20 +35,20 @@ func TestGetTorIP(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	ip, err := getTorIP()
+	ip, err := getTorIP(http.DefaultClient)
 	// an error is expected since nothing has been registered yet
 	assert.NotNil(t, err)
 	assert.Equal(t, ip, "", "There should be no IP address.")
 
 	page := newPage("Tor Project", "<strong>Random IP Address</strong>")
 	httpmock.RegisterResponder("GET", "https://check.torproject.org/", httpmock.NewStringResponder(200, page))
-	ip, err = getTorIP()
+	ip, err = getTorIP(http.DefaultClient)
 	assert.Nil(t, err)
 	assert.Equal(t, ip, "Random IP Address", "The IP address was not successfully extracted.")
 
 	page = newPage("Tor Project", "")
 	httpmock.RegisterResponder("GET", "https://check.torproject.org/", httpmock.NewStringResponder(200, page))
-	ip, err = getTorIP()
+	ip, err = getTorIP(http.DefaultClient)
 	assert.Nil(t, err)
 	assert.Equal(t, ip, "", "There should be no IP address.")
 }
@@ -61,7 +61,7 @@ func TestGetEmails(t *testing.T) {
 	page := newPage("Random Site", `<a href="mailto:random@gmail.com">Email me</a>`)
 	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
 
-	emails := getEmails(link)
+	emails := collectEmails(http.DefaultClient, link)
 	assert.Contains(t, emails, "random@gmail.com", "random@gmail.com should be in emails slice")
 	assert.Len(t, emails, 1, "Found more than 1 email address.")
 
@@ -71,7 +71,7 @@ func TestGetEmails(t *testing.T) {
 					<a href="mailto:random@outlook.com">email me</a>`)
 	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
 
-	emails = getEmails(link)
+	emails = collectEmails(http.DefaultClient, link)
 	assert.ElementsMatch(t, emails, []string{"random@gmail.com", "random@protonmail.com", "random@outlook.com", "random@yahoo.com"})
 }
 
@@ -82,7 +82,7 @@ func TestPhoneNumbers(t *testing.T) {
 
 	page := newPage("Random Site", `<a href="tel:+1-555-555-5555">Call me</a>`)
 	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
-	number := getPhoneNumbers(link)
+	number := collectPhoneNumbers(http.DefaultClient, link)
 	assert.Contains(t, number, "+1-555-555-5555", "The phone number should be in the slice.")
 	assert.Len(t, number, 1, "There should be only one phone number.")
 
@@ -91,7 +91,7 @@ func TestPhoneNumbers(t *testing.T) {
 					<a href="tel:+1-555-555-5557">call me</a>
 					<a href="tel:+1-555-555-5558">call me</a>`)
 	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, page))
-	numbers := getPhoneNumbers(link)
+	numbers := collectPhoneNumbers(http.DefaultClient, link)
 	assert.ElementsMatch(t, numbers, []string{"+1-555-555-5555", "+1-555-555-5556", "+1-555-555-5557", "+1-555-555-5558"})
 }
 
@@ -133,13 +133,13 @@ func TestGetWebsiteContent(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	content, err := getWebsiteContent(link)
+	content, err := collectWebsiteContent(http.DefaultClient, link)
 	assert.NotNil(t, err)
 	assert.Equal(t, "", content)
 
 	httpmock.RegisterResponder("GET", link, httpmock.NewStringResponder(200, "Hello World"))
 
-	content, err = getWebsiteContent(link)
+	content, err = collectWebsiteContent(http.DefaultClient, link)
 	assert.Nil(t, err)
 	assert.Equal(t, "Hello World", content)
 }
