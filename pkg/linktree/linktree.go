@@ -222,5 +222,4 @@ func (n *Node) Crawl(depth int, work func(link string)) {
 	wg := new(sync.WaitGroup)
 	crawl(n.client, wg, filteredStream, depth, filter, work)
 	wg.Wait()
-	fmt.Println("something")
 }
