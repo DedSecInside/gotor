@@ -53,12 +53,14 @@ func TestLoadNode(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	link := "https://www.test.com"
+	page := newPage("test", "")
+	httpmock.RegisterResponder(http.MethodGet, link, httpmock.NewStringResponder(http.StatusOK, page))
 	n := NewNode(http.DefaultClient, link)
 	n.Load(1)
 	assert.True(t, n.loaded)
 
 	childLink := "https://www.child1.com"
-	page := newPage("test", fmt.Sprintf(`<a href="%s">link to child</a>`, childLink))
+	page = newPage("test", fmt.Sprintf(`<a href="%s">link to child</a>`, childLink))
 	httpmock.RegisterResponder(http.MethodGet, link, httpmock.NewStringResponder(http.StatusOK, page))
 
 	n = NewNode(http.DefaultClient, link)
