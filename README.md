@@ -58,11 +58,11 @@ Make sure no other service is using the same port. The script uses the SOCKS5_PO
 
 ### To build and start the Docker containers:
 ```bash
-./build.sh
+./scripts/build.sh
 ```
 ### To stop and destroy the Docker containers:
 ```bash
-./destroy.sh
+./scripts/destroy.sh
 ```
 ## Documentation
 This project includes comprehensive code comments to facilitate documentation generation with godoc. To generate and access documentation, use the following command:
