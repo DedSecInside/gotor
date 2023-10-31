@@ -23,6 +23,15 @@ func New(client *http.Client, host string, port int) *Server {
 	}
 }
 
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Do stuff here
+		log.Println(r.RequestURI)
+		// Call the next handler, which can be another middleware in the chain, or the final handler.
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RunServer starts the server for the API, using the given client and port. Pass `nil` to use the default client, port must be specified
 func (s Server) Run() {
 	router := mux.NewRouter()
@@ -34,6 +43,8 @@ func (s Server) Run() {
 	router.HandleFunc("/content", s.handleGetWebsiteContent).Methods(http.MethodGet)
 
 	log.Printf("Attempting to start local gotor server. Host: %s - Port: %d\n", s.host, s.port)
+
+	router.Use(loggingMiddleware)
 
 	address := fmt.Sprintf("%s:%d", s.host, s.port)
 	err := http.ListenAndServe(address, router)

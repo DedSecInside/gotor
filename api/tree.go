@@ -12,20 +12,26 @@ import (
 
 // GetTreeNode returns a LinkTree with the specified depth passed to the query parameter.
 func (s Server) handleGetTreeNode(w http.ResponseWriter, r *http.Request) {
-	depthInput := r.URL.Query().Get("depth")
-	depth, err := strconv.Atoi(depthInput)
-	if err != nil {
-		log.Printf("Invalid depth, must be an integer. Depth %s. Error: %+v\n", depthInput, err)
-		w.Write([]byte("Invalid depth, must be an integer. Depth %s."))
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	depthInput := strings.TrimSpace(r.URL.Query().Get("depth"))
+	var depth int
+	var err error
+	if depthInput == "" {
+		depth = 1
+	} else {
+		depth, err = strconv.Atoi(depthInput)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Invalid depth, must be an integer. Depth %s."))
+			log.Printf("Invalid depth, must be an integer. Depth %s. Error: %+v\n", depthInput, err)
+			return
+		}
 	}
 
 	link := strings.TrimSpace(r.URL.Query().Get("link"))
 	if link == "" {
-		log.Println("Found blank link")
-		w.Write([]byte("Link cannot be blank."))
 		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Link cannot be blank."))
+		log.Println("Found blank link")
 		return
 	}
 

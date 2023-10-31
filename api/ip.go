@@ -41,15 +41,17 @@ func getTorIP(client *http.Client) (string, error) {
 func (s Server) handleGetIP(w http.ResponseWriter, r *http.Request) {
 	ip, err := getTorIP(s.client)
 	if err != nil {
-		log.Printf("Unable to retrieve IP. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Unable to get IP address."))
+		log.Printf("Unable to retrieve IP. Error: %+v\n", err)
 		return
 	}
 
 	_, err = w.Write([]byte(ip))
 	if err != nil {
-		log.Printf("Unable to write IP. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Unable to write IP address."))
+		log.Printf("Unable to write IP address. Error: %+v\n", err)
 		return
 	}
 }

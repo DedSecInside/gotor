@@ -47,12 +47,18 @@ func collectEmails(client *http.Client, link string) []string {
 
 // GetEmails writes an array of emails found on the given "link" passed in the query parameters by the client
 func (s Server) handleGetEmails(w http.ResponseWriter, r *http.Request) {
-	link := r.URL.Query().Get("link")
+	link := strings.TrimSpace(r.URL.Query().Get("link"))
+	if link == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Link must be specified."))
+		return
+	}
 	emails := collectEmails(s.client, link)
 	err := json.NewEncoder(w).Encode(emails)
 	if err != nil {
-		log.Printf("Unable to marshal. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Unable to serve email response."))
+		log.Printf("Unable to marshal. Error: %+v\n", err)
 		return
 	}
 }

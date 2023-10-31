@@ -28,12 +28,17 @@ func collectPhoneNumbers(client *http.Client, link string) []string {
 
 // GetPhoneNumbers writes a list of phone numbers using the `tel:` tag
 func (s Server) handleGetPhoneNumbers(w http.ResponseWriter, r *http.Request) {
-	link := r.URL.Query().Get("link")
+	link := strings.TrimSpace(r.URL.Query().Get("link"))
+	if link == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Link must be specified."))
+		return
+	}
 	phone := collectPhoneNumbers(s.client, link)
 	err := json.NewEncoder(w).Encode(phone)
 	if err != nil {
-		log.Printf("Unable to marshal. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("Unable to marshal. Error: %+v\n", err)
 		return
 	}
 }

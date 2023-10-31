@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
 // returns the body of a website as a string
@@ -24,16 +25,25 @@ func collectWebsiteContent(client *http.Client, link string) (string, error) {
 }
 
 func (s Server) handleGetWebsiteContent(w http.ResponseWriter, r *http.Request) {
-	link := r.URL.Query().Get("link")
+	link := strings.TrimSpace(r.URL.Query().Get("link"))
+	if link == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Link must be specified."))
+		return
+	}
+
 	content, err := collectWebsiteContent(s.client, link)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Unable to collect website content."))
+		log.Printf("Error: %+v\n", err)
 		return
 	}
 	err = json.NewEncoder(w).Encode(content)
 	if err != nil {
-		log.Printf("Unable to marshal. Error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error encountered attempting to serve response."))
+		log.Printf("Unable to marshal content. Error: %+v\n", err)
 		return
 	}
 }
