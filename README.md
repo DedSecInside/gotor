@@ -39,17 +39,17 @@ The program employs the TOR network for enhanced privacy and security during web
 #### Example Usage
 To start the HTTP server and initiate crawling, use the following command:
 ```bash
-go run cmd/main/main.go -s
+go run cmd/main/gotor.go -s
 ```
 
 w/ alternate host and port for server and SOCKS5 proxy:
 ```bash
-go run cmd/main/main.go -s -server-host 192.6.8.124 -server-port 8088 -socks5-host 127.0.0.1 -socks5-port 9051
+go run cmd/main/gotor.go -s -server-host 192.6.8.124 -server-port 8088 -socks5-host 127.0.0.1 -socks5-port 9051
 ```
 
 To crawl directly using the CLI and output the results to an Excel file, use the following command:
 ```bash
-go run cmd/main/main.go -url https://example.com -depth 2 -d
+go run cmd/main/gotor.go -url https://example.com -depth 2 -d
 ```
 
 ## Running with Docker
