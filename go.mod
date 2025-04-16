@@ -11,6 +11,6 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/stretchr/testify v1.8.0
 	github.com/xuri/excelize/v2 v2.4.1
-	golang.org/x/net v0.23.0
+	golang.org/x/net v0.38.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
