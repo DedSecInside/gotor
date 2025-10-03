@@ -2,29 +2,13 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
-	"net/http"
-	"net/url"
+	"time"
 
 	"github.com/DedSecInside/gotor/api"
+	"github.com/DedSecInside/gotor/internal/netx"
 	"github.com/DedSecInside/gotor/pkg/linktree"
 )
-
-// creates a http client using socks5 proxy
-func newTorClient(host string, port int) (*http.Client, error) {
-	proxyStr := fmt.Sprintf("socks5://%s:%d", host, port)
-	proxyURL, err := url.Parse(proxyStr)
-	if err != nil {
-		return nil, err
-	}
-	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-	}
-	return &http.Client{
-		Transport: transport,
-	}, nil
-}
 
 func main() {
 	url := flag.String("url", "", "URL used to initiate search. Root of the LinkTree. Required ")
@@ -49,18 +33,18 @@ func main() {
 		flag.CommandLine.Usage()
 		return
 	}
-	var client *http.Client = http.DefaultClient
-	var err error
+	client, err := netx.NewHTTPClient(netx.ClientOpts{
+		UseTor:       !*disableTor,
+		SocksHost:    *socks5Host,
+		SocksPort:    *socks5Port,
+		ReqTimeout:   30 * time.Second,
+		DialTimeout:  10 * time.Second,
+		MaxIdleConns: 10,
+	})
 
-	// overwrite client with tor client
-	if !*disableTor {
-		log.Println("Creating Tor client...")
-		log.Printf("SOCKS5 Proxy Address: %s:%d\n", *socks5Host, *socks5Port)
-		client, err = newTorClient(*socks5Host, *socks5Port)
-		if err != nil {
-			log.Fatalf("Unable to connect Tor. Error: %+v\n", err)
-			return
-		}
+	if err != nil {
+		log.Fatalf("Unable to connect Tor. Error: %+v\n", err)
+		return
 	}
 
 	// If the server flag is passed then all other flags are ignored.

@@ -1,10 +1,12 @@
 package linktree
 
 import (
+	"context"
 	"io"
 	"log"
 	"net/http"
 
+	"github.com/DedSecInside/gotor/internal/netx"
 	"golang.org/x/net/html"
 )
 
@@ -25,9 +27,15 @@ func streamTokens(client *http.Client, link string) chan html.Token {
 	tokenStream := make(chan html.Token, TOKEN_CHAN_SIZE)
 	go func() {
 		defer close(tokenStream)
-		resp, err := client.Get(link)
+		req, err := netx.NewRequest(context.Background(), "GET", link, "GoTor/1.0")
 		if err != nil {
-			log.Fatalf("Unable to get HTML to tokenize. Link %s. Error: %+v", link, err)
+			log.Printf("Unable to GET URL. URL %s. Error: %+v\n", link, err)
+			return
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("Unable to GET URL. URL %s. Error: %+v\n", link, err)
 			return
 		}
 		defer resp.Body.Close()

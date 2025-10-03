@@ -1,17 +1,27 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/DedSecInside/gotor/internal/netx"
 )
 
 // returns the body of a website as a string
 func collectWebsiteContent(client *http.Client, link string) (string, error) {
-	resp, err := client.Get(link)
+	req, err := netx.NewRequest(context.Background(), "GET", link, "GoTor/1.0")
 	if err != nil {
+		log.Printf("Unable to GET URL. URL %s. Error: %+v\n", link, err)
+		return "", err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Unable to GET URL. URL %s. Error: %+v\n", link, err)
 		return "", err
 	}
 	defer resp.Body.Close()

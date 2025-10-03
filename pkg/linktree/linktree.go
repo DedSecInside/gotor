@@ -2,6 +2,7 @@
 package linktree
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DedSecInside/gotor/internal/netx"
 	"github.com/mgutz/ansi"
 	"github.com/xuri/excelize/v2"
 )
@@ -100,7 +102,18 @@ func (n *Node) PrintList(depth int) {
 
 // UpdateStatus gets the current status of the node's URL
 func (n *Node) updateStatus() error {
-	resp, err := n.client.Get(n.URL)
+	// 1) Per-request timeout (separate from client.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	const uaDefault = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari"
+	req, err := netx.NewRequest(ctx, "GET", n.URL, uaDefault)
+	if err != nil {
+		log.Printf("Unable to GET URL. URL %s. Error: %+v\n", n.URL, err)
+		return err
+	}
+
+	resp, err := n.client.Do(req)
 	if err != nil {
 		log.Printf("Unable to GET URL. URL %s. Error: %+v\n", n.URL, err)
 		return err
