@@ -1,16 +1,17 @@
+// internal/crawl/frontier.go
 package crawl
 
 import (
-	"context"
 	"sync"
 )
 
 type Frontier struct {
-	ch    chan Task
-	seen  map[string]struct{}
-	mu    sync.Mutex
-	openW int // number of workers currently running
-	wg    sync.WaitGroup
+	ch       chan Task
+	mu       sync.Mutex
+	seen     map[string]struct{}
+	inflight int
+	closed   bool
+	once     sync.Once
 }
 
 func NewFrontier(size int) *Frontier {
@@ -22,47 +23,52 @@ func NewFrontier(size int) *Frontier {
 
 func (f *Frontier) EnqueueIfNew(t Task) bool {
 	f.mu.Lock()
-	defer f.mu.Unlock()
+	if f.closed {
+		f.mu.Unlock()
+		return false
+	}
 	key := t.URL.String()
 	if _, ok := f.seen[key]; ok {
+		f.mu.Unlock()
 		return false
 	}
 	f.seen[key] = struct{}{}
+	f.mu.Unlock()
+
 	select {
 	case f.ch <- t:
 		return true
 	default:
-		// queue full -> drop; upstream backpressure will naturally slow via limiter
-		// (alternatively, block here if you prefer harder backpressure)
+		// bounded queue backpressure: drop or switch to blocking send if preferred
 		return false
 	}
 }
 
 func (f *Frontier) Next() <-chan Task { return f.ch }
 
-func (f *Frontier) Close() { close(f.ch) }
+func (f *Frontier) markStart() {
+	f.mu.Lock()
+	f.inflight++
+	f.mu.Unlock()
+}
 
-func (f *Frontier) SeenCount() int {
+func (f *Frontier) markDone() {
+	f.mu.Lock()
+	f.inflight--
+	f.mu.Unlock()
+}
+
+func (f *Frontier) Stats() (queued, inflight int, closed bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.seen)
+	return len(f.ch), f.inflight, f.closed
 }
 
-// Helper used by pool to know when all workers are done.
-func (f *Frontier) incWorkers(n int) { f.mu.Lock(); f.openW += n; f.mu.Unlock() }
-func (f *Frontier) decWorkers()      { f.mu.Lock(); f.openW--; f.mu.Unlock() }
-func (f *Frontier) workersAlive() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.openW
-}
-
-// DrainAwareDone tells if we can terminate: channel drained and no workers alive.
-func (f *Frontier) DrainAwareDone() bool {
-	return f.workersAlive() == 0 && len(f.ch) == 0
-}
-
-func (f *Frontier) Wait(ctx context.Context) {
-	// For future expansion if we switch to internal waitgroup semantics
-	<-ctx.Done()
+func (f *Frontier) CloseOnce() {
+	f.once.Do(func() {
+		f.mu.Lock()
+		f.closed = true
+		close(f.ch)
+		f.mu.Unlock()
+	})
 }

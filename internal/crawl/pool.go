@@ -60,58 +60,67 @@ func (c *Crawler) Seed(rawURLs ...string) int {
 
 func (c *Crawler) Run(ctx context.Context, outFormat string) error {
 	g, ctx := errgroup.WithContext(ctx)
-
-	// Track active workers for drain-aware shutdown.
-	c.frontier.incWorkers(c.opts.Workers)
-
+	// internal/crawl/pool.go (inside Run)
 	for i := 0; i < c.opts.Workers; i++ {
 		g.Go(func() error {
-			defer c.frontier.decWorkers()
-
 			for {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
 				case t, ok := <-c.frontier.Next():
 					if !ok {
-						return nil // frontier closed
+						return nil // frontier closed -> worker exits
 					}
 
-					// Rate-limit globally.
+					// global rate-limit
 					if err := c.limiter.Wait(ctx); err != nil {
 						return err
 					}
 
+					// track in-flight
+					c.frontier.markStart()
 					if err := c.process(ctx, t, outFormat); err != nil {
-						// Log and continue; worker should not die unless context cancelled.
 						log.Printf("process error: %v", err)
 					}
+					c.frontier.markDone()
 				}
 			}
 		})
 	}
 
-	// Wait until frontier drains to a terminal state for MaxDepth, then close.
-	// We don’t spin: we poll light-weight with a timer to avoid busy-waiting.
-	t := time.NewTicker(150 * time.Millisecond)
-	defer t.Stop()
+	// internal/crawl/pool.go (inside Run, after launching workers)
+	done := make(chan struct{})
 
-	for {
-		select {
-		case <-ctx.Done():
-			c.frontier.Close()
-			_ = g.Wait()
-			return ctx.Err()
-		case <-t.C:
-			// Terminate condition: no more enqueues possible (all nodes at MaxDepth already expanded)
-			// AND queue drained AND workers idle. We infer “no more enqueues” because process()
-			// never enqueues beyond MaxDepth.
-			if c.frontier.DrainAwareDone() && len(c.frontier.Next()) == 0 {
-				c.frontier.Close()
-				return g.Wait()
+	go func() {
+		t := time.NewTicker(200 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				q, in, _ := c.frontier.Stats()
+				// When MaxDepth is respected in process(), no further enqueues will happen
+				// once everything at <= MaxDepth is processed. Drain condition:
+				if q == 0 && in == 0 {
+					c.frontier.CloseOnce()
+					close(done)
+					return
+				}
 			}
 		}
+	}()
+
+	select {
+	case <-done:
+		// graceful completion (max depth reached & drained)
+		return g.Wait()
+	case <-ctx.Done():
+		// external cancel (e.g., SIGINT)
+		c.frontier.CloseOnce()
+		return g.Wait()
 	}
+
 }
 
 // extractLinks parses <a href> tags from the body, resolves them against base,
