@@ -2,7 +2,6 @@ package crawl
 
 import (
 	"context"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/DedSecInside/gotor/internal/netx"
+	"github.com/DedSecInside/gotor/internal/parse"
 )
 
 type Crawler struct {
@@ -125,12 +125,7 @@ func (c *Crawler) Run(ctx context.Context, outFormat string) error {
 
 // extractLinks parses <a href> tags from the body, resolves them against base,
 // and returns absolute URLs suitable for enqueueing.
-func extractLinks(r io.Reader, base *url.URL) ([]*url.URL, error) {
-	doc, err := html.Parse(r)
-	if err != nil {
-		return nil, err
-	}
-
+func extractLinks(doc *html.Node, base *url.URL) ([]*url.URL, error) {
 	seen := make(map[string]struct{})
 	var links []*url.URL
 
@@ -177,7 +172,14 @@ func (c *Crawler) process(ctx context.Context, t Task, outFormat string) error {
 	}
 	defer resp.Body.Close()
 
-	links, err := extractLinks(resp.Body, t.URL)
+	doc, err := html.Parse(resp.Body)
+	if err != nil {
+		log.Printf("failed to parse HTML from %s: %v", t.URL.String(), err)
+		doc = &html.Node{Type: html.ElementNode, Data: "html"} // empty doc
+	}
+
+	pageMeta := parse.ExtractPageMeta(resp, t.URL, doc)
+	links, err := extractLinks(doc, t.URL)
 	if err != nil {
 		log.Printf("failed to parse links from %s: %v", t.URL, err)
 	}
@@ -188,7 +190,8 @@ func (c *Crawler) process(ctx context.Context, t Task, outFormat string) error {
 		// no-op here; assume caller aggregates via linktree package
 	default:
 		// list: log line for now (existing API/handlers can keep their own sinks)
-		log.Printf("depth=%d url=%s status=%d links=%d", t.Depth, t.URL, resp.StatusCode, len(links))
+		log.Printf("depth=%d url=%s status=%d links=%d\n", t.Depth, t.URL, resp.StatusCode, len(links))
+		log.Println(pageMeta)
 	}
 
 	// Enqueue children if we’re not at max depth yet.
