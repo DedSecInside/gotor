@@ -21,12 +21,13 @@ The program employs the TOR network for enhanced privacy and security during web
 * `-socks5-port`: Specify the SOCKS5 proxy port (default: 9050)
 * `-disable-socks5`: Run the program without the SOCKS5 proxy. 
 
+### Other options (Deprecated)
+
 ### REST API
 * `-server-host`: Specify the host that the server runs on (default: localhost / 127.0.0.1)
 * `-server-port`: Specify the port that the server runs on (default: 8081)
 * `-s`: Run the program as a service
 
-### Other options
 * `-d`: Download the results to an Excel spreadsheet (.xlsx)
 * `-f`: Output format for the results. Options are list or tree. (default: list)
 
@@ -37,19 +38,19 @@ The program employs the TOR network for enhanced privacy and security during web
 4. **Retrieving Emails**: Gathers email addresses found on websites.
 
 #### Example Usage
-To start the HTTP server and initiate crawling, use the following command:
+To start the HTTP server and initiate crawling, use the following command: (Deprecated)
 ```bash
 go run cmd/main/gotor.go -s
 ```
 
-w/ alternate host and port for server and SOCKS5 proxy:
+w/ alternate host and port for server and SOCKS5 proxy: (Deprecated)
 ```bash
 go run cmd/main/gotor.go -s -server-host 192.6.8.124 -server-port 8088 -socks5-host 127.0.0.1 -socks5-port 9051
 ```
 
-To crawl directly using the CLI and output the results to an Excel file, use the following command:
+To crawl directly using the CLI, use the following command:
 ```bash
-go run cmd/main/gotor.go -url https://example.com -depth 2 -d
+go run cmd/main/gotor.go -url https://example.com -depth 2
 ```
 
 ## Running with Docker
