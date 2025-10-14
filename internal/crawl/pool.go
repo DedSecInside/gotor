@@ -145,7 +145,7 @@ func extractLinks(r io.Reader, base *url.URL) ([]*url.URL, error) {
 					}
 					// Resolve relative paths and filter junk
 					u, err := base.Parse(href)
-					if err != nil || u.Scheme == "mailto" || u.Scheme == "javascript" {
+					if err != nil || u.Scheme == "mailto" || u.Scheme == "javascript" || u.Scheme == "data" || u.Scheme == "vbscript" {
 						continue
 					}
 					u.Fragment = "" // drop fragments
