@@ -65,6 +65,34 @@ Make sure no other service is using the same port. The script uses the SOCKS5_PO
 ```bash
 ./scripts/destroy.sh
 ```
+
+## Architecture
+```mermaid
+flowchart TD
+    User --> CLI
+    User --> API
+    CLI --> Scraper
+    API --> Scraper
+    Scraper --> TorProxy
+    Scraper --> HTTPClient
+    TorProxy --> TorNetwork
+    HTTPClient --> Internet
+
+    %% Node labels
+    CLI["CLI Interface"]
+    API["REST API"]
+    Scraper["Web Scraper Core (Go)"]
+    TorProxy["Tor Proxy"]
+    HTTPClient["HTTP Client"]
+    TorNetwork["Tor Network"]
+    Internet["Internet"]
+```
+**Description:**
+- Users interact via CLI or REST API.
+- Both interfaces connect to the Go-based scraper core.
+- The scraper routes requests via Tor or standard HTTP.
+- Requests reach either the Tor network or the normal Internet.
+
 ## Documentation
 This project includes comprehensive code comments to facilitate documentation generation with godoc. To generate and access documentation, use the following command:
 
