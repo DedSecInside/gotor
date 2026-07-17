@@ -217,83 +217,94 @@ func (c *Crawler) Errors() []CrawlError {
 func extractLinks(doc *html.Node, base *url.URL) ([]*url.URL, error) {
 	seen := make(map[string]struct{})
 	var links []*url.URL
-	effectiveBase := base
+	effectiveBase := documentBaseURL(doc, base)
+	collectDocumentLinks(doc, effectiveBase, seen, &links)
 
-	var findBase func(*html.Node)
-	findBase = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "base" {
-			for _, attribute := range n.Attr {
-				if attribute.Key != "href" {
-					continue
-				}
-				if parsed, err := base.Parse(strings.TrimSpace(attribute.Val)); err == nil {
-					effectiveBase = parsed
-				}
-				return
-			}
-		}
-		for child := n.FirstChild; child != nil; child = child.NextSibling {
-			findBase(child)
-		}
-	}
-	findBase(doc)
-
-	appendLink := func(rawURL string) {
-		rawURL = strings.TrimSpace(rawURL)
-		if rawURL == "" || strings.HasPrefix(rawURL, "#") {
-			return
-		}
-		parsedURL, err := effectiveBase.Parse(rawURL)
-		if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-			return
-		}
-		parsedURL.Fragment = ""
-		value := parsedURL.String()
-		if _, ok := seen[value]; ok {
-			return
-		}
-		seen[value] = struct{}{}
-		links = append(links, parsedURL)
-	}
-
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "a" {
-			for _, a := range n.Attr {
-				if a.Key == "href" {
-					appendLink(a.Val)
-				}
-			}
-		}
-		if n.Type == html.ElementNode && n.Data == "meta" {
-			var httpEquiv, content string
-			for _, attribute := range n.Attr {
-				switch strings.ToLower(attribute.Key) {
-				case "http-equiv":
-					httpEquiv = strings.ToLower(strings.TrimSpace(attribute.Val))
-				case "content":
-					content = attribute.Val
-				}
-			}
-			if httpEquiv == "refresh" {
-				if separator := strings.Index(content, ";"); separator >= 0 {
-					target := strings.TrimSpace(content[separator+1:])
-					if strings.HasPrefix(strings.ToLower(target), "url=") {
-						appendLink(strings.Trim(strings.TrimSpace(target[4:]), `"'`))
-					}
-				}
-			}
-		}
-		for child := n.FirstChild; child != nil; child = child.NextSibling {
-			walk(child)
-		}
-	}
-	walk(doc)
 	sort.Slice(links, func(i, j int) bool {
 		return links[i].String() < links[j].String()
 	})
-
 	return links, nil
+}
+
+func nodeAttribute(node *html.Node, name string) string {
+	for _, attribute := range node.Attr {
+		if strings.EqualFold(attribute.Key, name) {
+			return attribute.Val
+		}
+	}
+	return ""
+}
+
+func documentBaseURL(node *html.Node, fallback *url.URL) *url.URL {
+	if node.Type == html.ElementNode && node.Data == "base" {
+		if parsed, err := fallback.Parse(strings.TrimSpace(nodeAttribute(node, "href"))); err == nil {
+			return parsed
+		}
+	}
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if result := documentBaseURL(child, fallback); result != fallback {
+			return result
+		}
+	}
+	return fallback
+}
+
+func appendDocumentLink(
+	rawURL string,
+	base *url.URL,
+	seen map[string]struct{},
+	links *[]*url.URL,
+) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" || strings.HasPrefix(rawURL, "#") {
+		return
+	}
+	parsedURL, err := base.Parse(rawURL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+		return
+	}
+	parsedURL.Fragment = ""
+	value := parsedURL.String()
+	if _, ok := seen[value]; ok {
+		return
+	}
+	seen[value] = struct{}{}
+	*links = append(*links, parsedURL)
+}
+
+func metaRefreshURL(node *html.Node) string {
+	if !strings.EqualFold(strings.TrimSpace(nodeAttribute(node, "http-equiv")), "refresh") {
+		return ""
+	}
+	content := nodeAttribute(node, "content")
+	separator := strings.Index(content, ";")
+	if separator < 0 {
+		return ""
+	}
+	target := strings.TrimSpace(content[separator+1:])
+	if !strings.HasPrefix(strings.ToLower(target), "url=") {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(target[4:]), `"'`)
+}
+
+func collectDocumentLinks(
+	node *html.Node,
+	base *url.URL,
+	seen map[string]struct{},
+	links *[]*url.URL,
+) {
+	if node.Type == html.ElementNode {
+		switch node.Data {
+		case "a":
+			appendDocumentLink(nodeAttribute(node, "href"), base, seen, links)
+		case "meta":
+			appendDocumentLink(metaRefreshURL(node), base, seen, links)
+		}
+	}
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		collectDocumentLinks(child, base, seen, links)
+	}
 }
 
 func (c *Crawler) process(ctx context.Context, t Task) error {
@@ -320,32 +331,49 @@ func (c *Crawler) process(ctx context.Context, t Task) error {
 	}
 	defer resp.Body.Close()
 
-	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	pageMeta := parse.PageMeta{
-		URL:           t.URL.String(),
-		Status:        resp.StatusCode,
-		ContentType:   contentType,
-		ContentLength: resp.ContentLength,
+	pageMeta, body, skippedReason, err := c.readResponse(resp, t.URL)
+	if err != nil {
+		return err
+	}
+	if skippedReason != "" {
+		c.storeSkippedPage(t, pageMeta, skippedReason)
+		c.logFetch(t, resp, startedAt, skippedReason)
+		return nil
 	}
 
-	if resp.ContentLength > c.opts.MaxResponseBytes {
+	pageResult, links, err := analyzeHTMLPage(t, resp, body)
+	if err != nil {
+		return err
+	}
+	c.store.addResult(pageResult)
+	c.logFetch(t, resp, startedAt, "")
+	c.enqueueChildren(t, links)
+	return nil
+}
+
+func (c *Crawler) readResponse(
+	response *http.Response,
+	pageURL *url.URL,
+) (parse.PageMeta, []byte, string, error) {
+	contentType, _, _ := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	pageMeta := parse.PageMeta{
+		URL:           pageURL.String(),
+		Status:        response.StatusCode,
+		ContentType:   contentType,
+		ContentLength: response.ContentLength,
+	}
+
+	if response.ContentLength > c.opts.MaxResponseBytes {
 		reason := fmt.Sprintf(
 			"response is larger than %d bytes",
 			c.opts.MaxResponseBytes,
 		)
-		c.store.addResult(PageResult{
-			ParentURL:     t.ParentURL,
-			Depth:         t.Depth,
-			SkippedReason: reason,
-			Metadata:      pageMeta,
-		})
-		c.logFetch(t, resp, startedAt, reason)
-		return nil
+		return pageMeta, nil, reason, nil
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, c.opts.MaxResponseBytes+1))
+	body, err := io.ReadAll(io.LimitReader(response.Body, c.opts.MaxResponseBytes+1))
 	if err != nil {
-		return err
+		return pageMeta, nil, "", err
 	}
 	pageMeta.ContentLength = int64(len(body))
 	if int64(len(body)) > c.opts.MaxResponseBytes {
@@ -353,14 +381,7 @@ func (c *Crawler) process(ctx context.Context, t Task) error {
 			"response exceeded %d bytes while downloading",
 			c.opts.MaxResponseBytes,
 		)
-		c.store.addResult(PageResult{
-			ParentURL:     t.ParentURL,
-			Depth:         t.Depth,
-			SkippedReason: reason,
-			Metadata:      pageMeta,
-		})
-		c.logFetch(t, resp, startedAt, reason)
-		return nil
+		return pageMeta, nil, reason, nil
 	}
 
 	if contentType == "" {
@@ -370,57 +391,60 @@ func (c *Crawler) process(ctx context.Context, t Task) error {
 	isHTML := contentType == "text/html" || contentType == "application/xhtml+xml"
 	if !c.opts.AllowNonHTML && !isHTML {
 		reason := "non-HTML content type: " + contentType
-		c.store.addResult(PageResult{
-			ParentURL:     t.ParentURL,
-			Depth:         t.Depth,
-			SkippedReason: reason,
-			Metadata:      pageMeta,
-		})
-		c.logFetch(t, resp, startedAt, reason)
-		return nil
+		return pageMeta, nil, reason, nil
 	}
+	return pageMeta, body, "", nil
+}
 
+func (c *Crawler) storeSkippedPage(task Task, metadata parse.PageMeta, reason string) {
+	c.store.addResult(PageResult{
+		ParentURL:     task.ParentURL,
+		Depth:         task.Depth,
+		SkippedReason: reason,
+		Metadata:      metadata,
+	})
+}
+
+func analyzeHTMLPage(
+	task Task,
+	response *http.Response,
+	body []byte,
+) (PageResult, []*url.URL, error) {
 	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("parse HTML: %w", err)
+		return PageResult{}, nil, fmt.Errorf("parse HTML: %w", err)
 	}
 
-	pageMeta = parse.ExtractPageMeta(resp, t.URL, doc)
+	pageMeta := parse.ExtractPageMeta(response, task.URL, doc)
 	pageMeta.ContentLength = int64(len(body))
-	links, err := extractLinks(doc, t.URL)
+	links, err := extractLinks(doc, task.URL)
 	if err != nil {
-		return fmt.Errorf("extract links: %w", err)
+		return PageResult{}, nil, fmt.Errorf("extract links: %w", err)
 	}
 
 	linkStrings := make([]string, 0, len(links))
 	for _, link := range links {
-		if link.Scheme == "http" || link.Scheme == "https" {
-			linkStrings = append(linkStrings, link.String())
-		}
+		linkStrings = append(linkStrings, link.String())
 	}
-	c.store.addResult(PageResult{
-		ParentURL: t.ParentURL,
-		Depth:     t.Depth,
+	return PageResult{
+		ParentURL: task.ParentURL,
+		Depth:     task.Depth,
 		Links:     linkStrings,
 		Metadata:  pageMeta,
-	})
-	c.logFetch(t, resp, startedAt, "")
+	}, links, nil
+}
 
-	// Enqueue children if we’re not at max depth yet.
-	nextDepth := t.Depth + 1
+func (c *Crawler) enqueueChildren(task Task, links []*url.URL) {
+	nextDepth := task.Depth + 1
 	if nextDepth <= c.opts.MaxDepth {
 		for _, child := range links {
-			if child.Scheme != "http" && child.Scheme != "https" {
-				continue
-			}
 			_ = c.frontier.EnqueueIfNew(Task{
 				URL:       child,
-				ParentURL: t.URL.String(),
+				ParentURL: task.URL.String(),
 				Depth:     nextDepth,
 			})
 		}
 	}
-	return nil
 }
 
 func (c *Crawler) logFetch(
