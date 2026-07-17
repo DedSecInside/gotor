@@ -3,6 +3,7 @@ package parse
 import (
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -67,12 +68,42 @@ func extractMeta(n *html.Node, pm *PageMeta) {
 // walkDOM traverses the HTML node tree and extracts metadata into the PageMeta struct.
 func walkDOM(doc *html.Node, pm *PageMeta, base *url.URL) {
 	var h1Found bool
+	emails := map[string]struct{}{}
+	phoneNumbers := map[string]struct{}{}
+
 	eachNode(doc, func(n *html.Node) {
 		if n.Type != html.ElementNode {
 			return
 		}
 
 		switch n.Data {
+		case "html":
+			if pm.Lang == "" {
+				if lang, ok := getAttr(n, "lang"); ok {
+					pm.Lang = strings.ToLower(strings.TrimSpace(lang))
+				}
+			}
+
+		case "a":
+			href, _ := getAttr(n, "href")
+			href = strings.TrimSpace(href)
+			lowerHref := strings.ToLower(href)
+			switch {
+			case strings.HasPrefix(lowerHref, "mailto:"):
+				value := strings.TrimSpace(href[len("mailto:"):])
+				if query := strings.IndexByte(value, '?'); query >= 0 {
+					value = value[:query]
+				}
+				if value != "" {
+					emails[value] = struct{}{}
+				}
+			case strings.HasPrefix(lowerHref, "tel:"):
+				value := strings.TrimSpace(href[len("tel:"):])
+				if value != "" {
+					phoneNumbers[value] = struct{}{}
+				}
+			}
+
 		case "title":
 			if pm.Title == "" {
 				pm.Title = strings.TrimSpace(textOf(n))
@@ -99,6 +130,14 @@ func walkDOM(doc *html.Node, pm *PageMeta, base *url.URL) {
 		}
 	})
 
+	for email := range emails {
+		pm.Emails = append(pm.Emails, email)
+	}
+	for phoneNumber := range phoneNumbers {
+		pm.PhoneNumbers = append(pm.PhoneNumbers, phoneNumber)
+	}
+	sort.Strings(pm.Emails)
+	sort.Strings(pm.PhoneNumbers)
 }
 
 // ExtractPageMeta extracts metadata from the HTTP response and parsed HTML document.
@@ -123,11 +162,6 @@ func ExtractPageMeta(resp *http.Response, base *url.URL, doc *html.Node) PageMet
 
 	// walks DOM and fills PageMeta
 	walkDOM(doc, &pm, base)
-
-	// <html lang>
-	if lang, ok := getAttr(doc, "lang"); ok {
-		pm.Lang = strings.ToLower(strings.TrimSpace(lang))
-	}
 
 	// Fallback canonical
 	if pm.Canonical == "" {

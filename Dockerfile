@@ -1,13 +1,19 @@
-FROM golang:1.21-alpine
+FROM golang:1.24.7-alpine AS build
 
-WORKDIR /go/src/gotor
-
-# move over source code directories
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/gotor \
+    ./cmd/main
 
-RUN go mod download
-RUN go mod verify
-RUN go build -o gotor cmd/main/gotor.go
+FROM gcr.io/distroless/static-debian12:nonroot
 
+COPY --from=build /out/gotor /gotor
 EXPOSE 8081
-CMD ["./gotor", "-s"]
+USER nonroot:nonroot
+ENTRYPOINT ["/gotor"]
+CMD ["-s", "-server-host", "0.0.0.0", "-server-port", "8081", "-log-format", "json"]

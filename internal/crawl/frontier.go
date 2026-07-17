@@ -10,6 +10,7 @@ type Frontier struct {
 	mu       sync.Mutex
 	seen     map[string]struct{}
 	inflight int
+	pending  int
 	closed   bool
 	once     sync.Once
 }
@@ -23,23 +24,21 @@ func NewFrontier(size int) *Frontier {
 
 func (f *Frontier) EnqueueIfNew(t Task) bool {
 	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.closed {
-		f.mu.Unlock()
 		return false
 	}
 	key := t.URL.String()
 	if _, ok := f.seen[key]; ok {
-		f.mu.Unlock()
 		return false
 	}
-	f.seen[key] = struct{}{}
-	f.mu.Unlock()
 
 	select {
 	case f.ch <- t:
+		f.seen[key] = struct{}{}
+		f.pending++
 		return true
 	default:
-		// bounded queue backpressure: drop or switch to blocking send if preferred
 		return false
 	}
 }
@@ -55,13 +54,14 @@ func (f *Frontier) markStart() {
 func (f *Frontier) markDone() {
 	f.mu.Lock()
 	f.inflight--
+	f.pending--
 	f.mu.Unlock()
 }
 
-func (f *Frontier) Stats() (queued, inflight int, closed bool) {
+func (f *Frontier) Stats() (queued, inflight, pending int, closed bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.ch), f.inflight, f.closed
+	return len(f.ch), f.inflight, f.pending, f.closed
 }
 
 func (f *Frontier) CloseOnce() {
