@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Versioned JSON crawl reports for CLI and application integrations.
+- REST job control with start, inspect, cancel, health, and readiness endpoints
+  (#72).
+- Tor configuration diagnostics with SOCKS reachability, `torrc` discovery,
+  configured ports, data directory, and executable discovery.
+- Parent relationships, page metadata, email addresses, phone numbers, and
+  partial crawl errors in reports.
+- Per-host parallelism and delay controls (#74).
+- Optional randomized browser user-agent headers (#44).
+- Structured text or JSON logging with configurable levels (#76).
+- Response-size and content-type guardrails, `<base>` URL resolution, and meta
+  refresh discovery (#77).
+- Race-tested coverage for crawler relationships, contact extraction,
+  politeness limits, job cancellation, and Tor diagnostics.
+
+### Changed
+
+- Replaced crawler log output with deterministic list, tree, and JSON formats.
+- Hardened the container as a non-root multi-stage distroless image.
+- Updated CI to enforce formatting, vetting, race tests, coverage, and builds.
+- Reworked the README and API reference around the current v3 crawler.
+
+### Fixed
+
+- Prevented the frontier from closing while a worker is still processing its
+  final queued page.
+- Restored the HTTP service removed during the concurrency rewrite.
+- Corrected the stale Docker build path.
+
 ## v2.0.0 - 2023-08-28
 Bug fixes, slight performance updates, and some refactoring
 
